@@ -124,10 +124,10 @@ const steps = new StepRegistry()
 // goes red, a guest leaked into the room.
 describe("the engine stays guest-agnostic", () => {
   // The engine itself — NOT the test fixture (which names a non-Claude hotel) or
-  // the README (which references the consumer to illustrate the mapping). v0
-  // ships the tested core (mod + gherkin); the daemon/protocol/secret modules
-  // re-join this list when they land with tests.
-  const engineFiles = ["mod.ts", "gherkin.ts"];
+  // the README (which references the consumer to illustrate the mapping). The
+  // remaining secret-layer modules (hotel-safe / room-service) re-join this list
+  // when they land here with tests.
+  const engineFiles = ["mod.ts", "gherkin.ts", "protocol.ts", "daemon.ts"];
   const guestIdentities = /\b(claude|anthropic|podman|keeperd|netd|scoutd|launcherd)\b/i;
 
   for (const file of engineFiles) {

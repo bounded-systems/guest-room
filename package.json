@@ -12,6 +12,8 @@
   },
   "exports": {
     ".": "./mod.ts",
+    "./protocol": "./protocol.ts",
+    "./daemon": "./daemon.ts",
     "./gherkin": "./gherkin.ts"
   },
   "scripts": {
