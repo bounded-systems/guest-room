@@ -1,0 +1,5 @@
+# Code owners — reviewers are auto-requested on matching paths.
+# https://docs.github.com/repositories/managing-your-repos-settings-and-features/customizing-your-repository/about-code-owners
+
+# Require review from the maintainers team on everything.
+*       @bounded-systems/maintainers
