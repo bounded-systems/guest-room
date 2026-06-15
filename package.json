@@ -1,0 +1,20 @@
+{
+  "name": "@bounded-systems/guest-room",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Guest-agnostic room+door capability runtime — the core library claude-box is built on.",
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "author": "Robert DeLanghe (https://github.com/bdelanghe)",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bounded-systems/guest-room.git"
+  },
+  "exports": {
+    ".": "./mod.ts",
+    "./gherkin": "./gherkin.ts"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}
