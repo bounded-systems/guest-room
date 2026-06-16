@@ -110,10 +110,11 @@ authority-scoping — pure and decidable from the request alone (`host=`,
 `(value, ctx) => boolean` with no engine state, and it should stay that way.
 Budget and time-to-live are neither: they are stateful, temporal, cross-cutting
 concerns the room cannot see and should not carry. Push them down to where the
-spend and the clock actually live — the **service** (the broker daemon holds the
-meter and the deadline), the **message** (the door protocol envelope carries and
-enforces them per request), or the **telemetry** layer (OTel spans already carry
-cost and duration; a collector kills the workcell when a threshold trips). The
+spend and the clock actually live — the **service** (the broker projects the
+meter and the deadline from an append-only artifact log; see *State in artifacts*
+below), the **message** (the door protocol envelope carries and enforces them per
+request), or the **telemetry** layer (OTel spans already carry cost and duration;
+a collector kills the workcell when a threshold trips). The
 room may carry at most a **correlation salt** so that spend and spans attribute
 back to a grant — never the budget itself. guest-room already shows the pattern:
 its only expiry, the provider **lease** (`expiresAt`, enforced by
@@ -172,7 +173,43 @@ say which we're claiming:
   against `mod.ts`, so each behavioral claim is checkable — but they are tests,
   not proofs, and this doc does not let coverage wear proof's clothes.
 
-## 5. Where guest-room sits: under a provenance layer
+## 5. State in artifacts, not runtime — cold-start resumable
+
+The bet generalizes one level down: *authority in artifacts, not actors* becomes
+*state in artifacts, not runtime*. If the broker keeps the registry, the leases,
+and the meter in process memory, it has made the **runtime** load-bearing the
+same way trusting intent makes the **actor** load-bearing — you are trusting it
+to *remember correctly*, and that trust is ephemeral and unauditable. So the
+runtime is a pure **projection** over content-addressed, append-only artifacts,
+and cold start is just re-folding the log: kill the broker, restart it, and the
+state reconstructs identically.
+
+This engine is already shaped for it. `mod.ts` holds **zero** state — every
+function is a pure fold over its arguments. `resolveProvider(entries, capability,
+want, now)` takes the registry *and the clock* as inputs (`mod.ts`,
+*Introduction*); `isConfined` takes `entries`; nothing reads ambient time or a
+module-level store. The engine never assumes `entries` came from RAM rather than
+a replayed artifact log, so it is **cold-start-resumable by construction**, and
+deterministic with it: the same artifacts plus the same `now` project to the same
+result — which is exactly the reproducibility an attestation wants.
+
+It *removes* a trusted component rather than adding one. Artifact-held state
+shifts the trust from "the broker remembers honestly" (a hidden, ephemeral TCB
+element — the kind the membership test above says to delete) to "the artifact log
+has integrity", which is **already** a TCB line (CAS / signing). One fewer thing
+trusted, and the survivor is auditable. The store the broker projects from *is*
+the anchored chain below: registry, leases, and metered spend as append-only
+signed records, with the meter a fold over them — which makes budget *provable*,
+not merely enforced.
+
+Scope it honestly, so the principle does not over-reach: **durable truth** lives
+in artifacts (registry, leases, meters, lineage); **transient I/O** — open
+sockets, in-flight buffers, the disposable tmpfs workspace — stays in runtime and
+is *meant* to evaporate. Cold start resumes the durable state; in-flight work
+re-derives, which is safe because work products are themselves idempotent
+artifacts in the chain.
+
+## 6. Where guest-room sits: under a provenance layer
 
 guest-room is the **door / room / introduction substrate** — mechanical and
 capability isolation, and the algebra above. It deliberately stops short of one
