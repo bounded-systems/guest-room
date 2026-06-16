@@ -94,7 +94,7 @@ and attenuation answers only the first:
 | Harm | Example | Defense | Where |
 |---|---|---|---|
 | **Authority misuse** (confused deputy) | acts outside its grant | **attenuation** — bound the authority | guest-room (`attenuate` / `isConfined`) — done |
-| **Resource exhaustion** (denial-of-wallet) | burns its budget on authorized-but-wasteful work | **metering** — a `budget=N` caveat checked by a metering verifier | *not* in the engine; needs inference to be a brokered door, and a **stateful** verifier (see below) |
+| **Resource exhaustion** (denial-of-wallet) | burns its budget on authorized-but-wasteful work | **metering** — at the service / message / telemetry layer | *below* the room — not a caveat, not the engine (see below) |
 | **Undesirable output** | a cheap, confidently wrong answer (one token) | **attestation gate** — no valid evidence, no transition | PRX's anchored chain, not guest-room |
 
 A perfectly attenuated, perfectly confined workcell can still burn its whole
@@ -104,14 +104,22 @@ third. "Attack" is a fine *accounting* word — count all three against the budg
 but a category error as a *defense* word: reaching for attenuation leaves the
 other two unhandled.
 
-Metering is worth one note, because it is **not** "just another caveat". Every
-verifier today (`CaveatVerifier`, *Enforcement*) is pure — `(value, ctx) =>
-boolean`, decidable from the request alone (`host=`, `mode=read-only`). A
-`budget=N` caveat is a running sum across requests: the meter must live in the
-broker's `ctx` and be monotonic and unforgeable. So it is the *first stateful
-verifier*, and **metering correctness** (that counter) is its own TCB line — not
-folded into the four below. (Note guest-room's only expiry today is the provider
-*lease*, `expiresAt`, enforced by `liveProviders` — not a per-call caveat.)
+**Budget and TTL belong below the room, not in the caveat algebra.** A caveat is
+authority-scoping — pure and decidable from the request alone (`host=`,
+`mode=read-only`); every verifier today (`CaveatVerifier`, *Enforcement*) is
+`(value, ctx) => boolean` with no engine state, and it should stay that way.
+Budget and time-to-live are neither: they are stateful, temporal, cross-cutting
+concerns the room cannot see and should not carry. Push them down to where the
+spend and the clock actually live — the **service** (the broker daemon holds the
+meter and the deadline), the **message** (the door protocol envelope carries and
+enforces them per request), or the **telemetry** layer (OTel spans already carry
+cost and duration; a collector kills the workcell when a threshold trips). The
+room may carry at most a **correlation salt** so that spend and spans attribute
+back to a grant — never the budget itself. guest-room already shows the pattern:
+its only expiry, the provider **lease** (`expiresAt`, enforced by
+`liveProviders`), lives in the broker's registry, not as a room caveat. Budget
+follows TTL down. **Metering correctness** is therefore a TCB line of the *service
+/ telemetry* layer, not a verifier in this engine.
 
 ### The TCB, and the gaps that are named not closed
 
