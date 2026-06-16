@@ -1,0 +1,26 @@
+{
+  "name": "@bounded-systems/guest-room",
+  "version": "0.1.0",
+  "exports": {
+    ".": "./mod.ts",
+    "./protocol": "./protocol.ts",
+    "./daemon": "./daemon.ts",
+    "./gherkin": "./gherkin.ts"
+  },
+  "publish": {
+    "include": [
+      "mod.ts",
+      "protocol.ts",
+      "daemon.ts",
+      "gherkin.ts",
+      "README.md",
+      "LICENSE",
+      "docs/**/*.md"
+    ],
+    "exclude": [
+      "**/*.test.ts",
+      "features",
+      ".github"
+    ]
+  }
+}
