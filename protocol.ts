@@ -10,7 +10,41 @@
  * logic (what methods they handle), not the envelope parsing.
  */
 
-import type { Socket } from "bun";
+import { Buffer } from "node:buffer";
+
+// This module's server half is transport-neutral; its client half (`call`)
+// targets Bun's socket API. Rather than depend on `@types/bun` (a bare "bun"
+// specifier JSR cannot resolve), we declare the minimal structural surface we
+// touch locally — Bun's real types are structurally assignable, so consumers on
+// Bun are unaffected and the module carries no unresolvable dependency.
+
+/** The subset of a connection socket the server handlers use: a per-connection
+ *  `data` bag plus `write`. Bun's `Socket<Cx>` is structurally assignable. */
+export interface DoorSocket<Cx> {
+  data: Cx;
+  write(data: string | Uint8Array): number;
+}
+
+/** The subset of a Bun client socket `call` uses. */
+interface ClientSocket {
+  write(data: string | Uint8Array): number;
+  end(): void;
+}
+
+/** Bun's runtime global, declared locally with only the shape `call` needs (so
+ *  the module type-checks without @types/bun). At runtime this is Bun's global,
+ *  so `call` runs under the Bun runtime. */
+declare const Bun: {
+  connect(options: {
+    unix: string;
+    socket: {
+      data(socket: ClientSocket, chunk: Uint8Array): void;
+      open(socket: ClientSocket): void;
+      error(socket: ClientSocket, error: Error): void;
+      close(socket: ClientSocket): void;
+    };
+  }): Promise<{ catch(onrejected: (reason: unknown) => void): unknown }>;
+};
 
 // ── Protocol types (shared across all doors) ────────────────────────────────
 
@@ -61,10 +95,10 @@ export function createDoorHandlers<Cx extends { buffer: string }>(
   methods: MethodRegistry,
   log: (level: "INFO" | "ERR" | "ALLOW" | "DENY" | "WARN", msg: string) => void,
 ): {
-  open: (socket: Socket<Cx>) => void;
-  data: (socket: Socket<Cx>, chunk: Uint8Array) => void;
-  close: (socket: Socket<Cx>) => void;
-  error: (socket: Socket<Cx>, error: Error) => void;
+  open: (socket: DoorSocket<Cx>) => void;
+  data: (socket: DoorSocket<Cx>, chunk: Uint8Array) => void;
+  close: (socket: DoorSocket<Cx>) => void;
+  error: (socket: DoorSocket<Cx>, error: Error) => void;
 } {
   return {
     open(socket) {

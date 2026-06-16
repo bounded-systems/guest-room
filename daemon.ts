@@ -14,6 +14,7 @@
  */
 
 import { mkdirSync, unlinkSync } from "node:fs";
+import process from "node:process";
 
 export type Env = Record<string, string | undefined>;
 
