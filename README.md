@@ -13,7 +13,10 @@ built on: nothing in here knows or cares who the guest is.
 > to one brokered service, never the keys behind it, and never the building.
 
 See [`docs/the-guest-room.md`](docs/the-guest-room.md) for the full essay —
-*why we stopped building a box for Claude and started building a room for anyone*.
+*why we stopped building a box for Claude and started building a room for anyone* —
+and [`docs/authority-and-attenuation.md`](docs/authority-and-attenuation.md) for
+*what guest-room proves about authority (attenuation, confinement), what it
+defers to the substrate, and where it sits under a provenance layer*.
 
 ## The model
 

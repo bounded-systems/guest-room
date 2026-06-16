@@ -25,6 +25,9 @@ import {
   grantedDoorLines,
   deniedDoorSection,
   transportString,
+  resolveProvider,
+  isConfined,
+  type ProviderEntry,
 } from "./mod.ts";
 import { parseFeature, StepRegistry, type World } from "./gherkin.ts";
 
@@ -115,6 +118,36 @@ const steps = new StepRegistry()
   .step(/^the rulebook does not deny "([^"]*)"$/, (w, name) => {
     const denied = deniedDoors(w.catalog as DoorCatalog, grantNames(w), suppressOf(w));
     expect(denied.map((d) => d.name)).not.toContain(name);
+  })
+
+  // confinement: a capability the concierge hands out stays bound to its
+  // provider — no wider than the ceiling, and only while the lease is live
+  .step(/^a concierge registry with a "([^"]*)" provider on the "([^"]*)" door, ceiling "([^"]*)", leased until (\d+)$/,
+    (w, cap, door, ceiling, until) => {
+      const base = resolveDoor(w.catalog as DoorCatalog, door, undefined, env);
+      const ceil = ceiling ? attenuate(base, [ceiling]) : base;
+      w.entries = [{ capability: cap, door: ceil, expiresAt: Number(until) }] satisfies ProviderEntry[];
+      w.capability = cap;
+    })
+  .step(/^a consumer is introduced to "([^"]*)" at time (\d+) wanting "([^"]*)"$/,
+    (w, cap, now, want) => {
+      w.held = resolveProvider(w.entries as ProviderEntry[], cap, want ? [want] : [], Number(now));
+    })
+  .step(/^a consumer is introduced to "([^"]*)" at time (\d+)$/, (w, cap, now) => {
+    w.held = resolveProvider(w.entries as ProviderEntry[], cap, [], Number(now));
+  })
+  .step(/^the introduction yields a capability$/, (w) => { expect(w.held).not.toBeNull(); })
+  .step(/^the introduction yields nothing$/, (w) => { expect(w.held).toBeNull(); })
+  .step(/^a forged capability drops the "([^"]*)" caveat$/, (w, caveat) => {
+    const held = w.held as DoorGrant;
+    w.held = { ...held, caveats: (held.caveats ?? []).filter((c) => c !== caveat) };
+  })
+  .step(/^the held capability is confined at time (\d+)$/, (w, now) => {
+    expect(isConfined(w.held as DoorGrant, w.entries as ProviderEntry[], w.capability as string, Number(now))).toBe(true);
+  })
+  .step(/^the held capability is not confined at time (\d+)$/, (w, now) => {
+    const held = w.held as DoorGrant | null;
+    expect(held === null || !isConfined(held, w.entries as ProviderEntry[], w.capability as string, Number(now))).toBe(true);
   });
 
 // ── the seam is enforced, not just documented ────────────────────────────────

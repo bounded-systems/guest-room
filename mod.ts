@@ -316,6 +316,36 @@ export function resolveProvider(
   return attenuate(live[0]!.door, want);
 }
 
+// ── Confinement ──────────────────────────────────────────────────────────────
+// The property the whole design turns on: a capability never becomes durable
+// authority owned by its holder. Authority is valid only while a live provider
+// backs it, and only within that provider's ceiling — so it dies with the
+// workcell (the lease lapses) and can never be captured wider than it was lent.
+// This is the engine-side statement of "an agent does not become a new actor
+// type": a held grant is a capability checked against the live registry, never a
+// standing property of whoever holds it.
+//
+// TCB note: this proves the ALGEBRA of confinement (lease-gated + ceiling-bound)
+// purely. It does not prove the runtime cannot stash a socket fd past teardown —
+// that reduces to the substrate (disposable workcell, lease clock) the broker
+// owns. The gap is named, not closed: see docs/authority-and-attenuation.md.
+
+/** Is `held` a capability the concierge could legitimately have handed out at
+ *  `now` — i.e. backed by a LIVE provider for `capability` and no wider than that
+ *  provider's ceiling? False once every backing lease has lapsed (the capability
+ *  does not outlive its provider) or if `held` widened past the ceiling (it was
+ *  never a derivation the concierge could grant). Mirrors `resolveProvider`'s
+ *  guarantee from the verification side: what was handed out stays confined. */
+export function isConfined(
+  held: DoorGrant,
+  entries: ProviderEntry[],
+  capability: string,
+  now: number,
+): boolean {
+  const live = liveProviders(entries, capability, now);
+  return live.some((p) => attenuatesDoors([held], [p.door]).ok);
+}
+
 /** Expand a named room to its door grants. Throws (fail closed, not a silent
  *  empty launch) if the room is unknown — a typo must never widen authority. */
 export function expandRoom(
