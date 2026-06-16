@@ -75,20 +75,68 @@ so the property can't drift into prose: a live grant is confined; the same grant
 after the lease lapses is not; a grant forged wider than the ceiling is not; a
 dead capability is never introduced at all.
 
-### The TCB, and the gap that is named not closed
+But note the scope precisely: `isConfined` is **relative to the registry**. It
+proves a held grant is bounded by *some live provider's declared ceiling* — it
+never validates that the ceiling was legitimate to register. A provider that
+registers a too-wide door makes `isConfined` return `true` over already-broken
+authority, and the engine faithfully attenuates from the rotten root. Confinement
+is conditional on **provider admission**, which is the broker's, not the engine's
+(see the TCB below).
+
+### What attenuation does and does not defend
+
+Because the engine is intent-blind — it scores effects, not motives, so a
+confused or compromised actor is treated identically to a hostile one — it is
+tempting to call all undesirable agent behavior an "attack" and reach for the
+authority machinery. That conflates three harms with three different defenses,
+and attenuation answers only the first:
+
+| Harm | Example | Defense | Where |
+|---|---|---|---|
+| **Authority misuse** (confused deputy) | acts outside its grant | **attenuation** — bound the authority | guest-room (`attenuate` / `isConfined`) — done |
+| **Resource exhaustion** (denial-of-wallet) | burns its budget on authorized-but-wasteful work | **metering** — a `budget=N` caveat checked by a metering verifier | *not* in the engine; needs inference to be a brokered door, and a **stateful** verifier (see below) |
+| **Undesirable output** | a cheap, confidently wrong answer (one token) | **attestation gate** — no valid evidence, no transition | PRX's anchored chain, not guest-room |
+
+A perfectly attenuated, perfectly confined workcell can still burn its whole
+inference budget on fully-authorized work, and can still emit a wrong answer that
+cost almost nothing. Confinement and budget are orthogonal axes; correctness is a
+third. "Attack" is a fine *accounting* word — count all three against the budget —
+but a category error as a *defense* word: reaching for attenuation leaves the
+other two unhandled.
+
+Metering is worth one note, because it is **not** "just another caveat". Every
+verifier today (`CaveatVerifier`, *Enforcement*) is pure — `(value, ctx) =>
+boolean`, decidable from the request alone (`host=`, `mode=read-only`). A
+`budget=N` caveat is a running sum across requests: the meter must live in the
+broker's `ctx` and be monotonic and unforgeable. So it is the *first stateful
+verifier*, and **metering correctness** (that counter) is its own TCB line — not
+folded into the four below. (Note guest-room's only expiry today is the provider
+*lease*, `expiresAt`, enforced by `liveProviders` — not a per-call caveat.)
+
+### The TCB, and the gaps that are named not closed
 
 `isConfined` proves the *algebra* of confinement — lease-gated and
-ceiling-bound — purely and analyzably. It does **not** prove the runtime cannot
-stash a socket fd and use it after teardown. That reduces to the substrate: the
-disposable workcell (`ReadOnly` + tmpfs, reset at checkout) and the lease clock,
-both owned by the broker and the runtime, not by this engine. The trusted base
-is small and explicit:
+ceiling-bound — purely and analyzably. It does **not** prove (a) the runtime
+cannot stash a socket fd and use it after teardown, nor (b) that a provider's
+ceiling was legitimate to register. Both reduce to the broker and substrate, not
+this engine. The trusted base is small and explicit:
 
 - **CAS / signing integrity** and **lease honesty** — the broker's
+- **provider admission / ceiling honesty** — *who may register a door, and how
+  its declared ceiling is bounded* — the broker's. This is the root `isConfined`
+  trusts; a too-wide ceiling here voids confinement downstream.
 - **workcell isolation** (the fd really dies at teardown) — the substrate's
 - **caveat enforcement** — the broker's verifiers, combined fail-closed by the
   engine (next section)
 - **the attenuation algebra** — *this engine's*, and the part proven here
+
+These pass the membership test the intent-blindness principle implies: a
+legitimate TCB element is auditable mechanism (a deterministic verifier, an
+isolation boundary, a revocation path) trusted because it is small, fixed, and
+inspectable — never an actor trusted because it "means well." Provider admission
+earns its place only if it is *structural* bounding, not "this registration looks
+legitimate"; trusting a desirable-looking provider's self-declared ceiling is the
+same intent-trust the principle forbids, just relocated one seam down.
 
 The substrate gap is the same one the founding essay already flags as the open
 problem — *"who keeps the room honest"* (`docs/the-guest-room.md`, **The next
@@ -108,8 +156,10 @@ say which we're claiming:
   (append-only) with `attenuatesDoors` and `isConfined` (ceiling-bound). These
   are small pure functions specifically so they're analyzable.
 - **Reduction** (the realistic target): *if* CAS integrity, signature
-  verification, workcell isolation, and lease honesty hold, *then* the properties
-  hold. The list is short and auditable on purpose.
+  verification, workcell isolation, lease honesty, and honest provider admission
+  (legitimate ceilings) hold, *then* the properties hold. The list is short and
+  auditable on purpose — and confinement is only as sound as its weakest root,
+  the registered ceiling.
 - **Coverage** (what the suite ships): the `features/*.feature` files **execute**
   against `mod.ts`, so each behavioral claim is checkable — but they are tests,
   not proofs, and this doc does not let coverage wear proof's clothes.

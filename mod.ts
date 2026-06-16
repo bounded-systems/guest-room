@@ -326,9 +326,14 @@ export function resolveProvider(
 // standing property of whoever holds it.
 //
 // TCB note: this proves the ALGEBRA of confinement (lease-gated + ceiling-bound)
-// purely. It does not prove the runtime cannot stash a socket fd past teardown —
-// that reduces to the substrate (disposable workcell, lease clock) the broker
-// owns. The gap is named, not closed: see docs/authority-and-attenuation.md.
+// purely, and it is RELATIVE TO THE REGISTRY: it trusts each provider's declared
+// ceiling. It does not prove (a) the runtime cannot stash a socket fd past
+// teardown, nor (b) that a provider's ceiling was legitimate to register. Both
+// reduce to the broker/substrate, not this engine: workcell isolation, the lease
+// clock, and PROVIDER ADMISSION (who may register a door, and how its ceiling is
+// bounded) are the broker's. A too-wide ceiling makes confinement vacuous at that
+// root — the engine will faithfully attenuate from broken authority. The gap is
+// named, not closed: see docs/authority-and-attenuation.md.
 
 /** Is `held` a capability the concierge could legitimately have handed out at
  *  `now` — i.e. backed by a LIVE provider for `capability` and no wider than that
