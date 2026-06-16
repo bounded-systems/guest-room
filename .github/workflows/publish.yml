@@ -1,13 +1,16 @@
 name: Publish to JSR
 
-# Publishes @bounded-systems/guest-room to JSR on a GitHub Release, and
-# validates the package (slow-type + resolvability checks via a dry-run) on every
-# PR and on demand — so a publish can never be the first time the package is
-# checked. Auth is OIDC: once the package is linked to this repo at
-# https://jsr.io/@bounded-systems/guest-room, no token/secret is needed.
+# Publishes @bounded-systems/guest-room to JSR on a GitHub Release OR a pushed
+# `v*` tag (e.g. `git push origin v0.1.0`), and validates the package (slow-type
+# + resolvability checks via a dry-run) on every PR and on demand — so a publish
+# can never be the first time the package is checked. Auth is OIDC: once the
+# package is linked to this repo at https://jsr.io/@bounded-systems/guest-room,
+# no token/secret is needed. Tag a release to match jsr.json's version.
 on:
   release:
     types: [published]
+  push:
+    tags: ["v*"]
   pull_request:
   workflow_dispatch:
 
@@ -33,10 +36,10 @@ jobs:
       # Dry-run on PRs / manual dispatch: validates exports, slow types, and that
       # every import resolves — without publishing and without needing auth.
       - name: Validate package (dry-run)
-        if: github.event_name != 'release'
+        if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
         run: bunx jsr publish --dry-run
-      # Real publish only from a Release. Version is whatever jsr.json declares;
-      # tag the release to match (e.g. v0.1.0 → "version": "0.1.0").
+      # Real publish from a Release or a pushed v* tag. Version is whatever
+      # jsr.json declares; tag to match (e.g. v0.1.0 → "version": "0.1.0").
       - name: Publish to JSR
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
         run: bunx jsr publish
