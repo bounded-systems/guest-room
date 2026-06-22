@@ -99,3 +99,21 @@ describe("call ↔ createDoorHandlers over a real unix socket", () => {
     await expect(call(sockPath, "fail")).rejects.toThrow("boom");
   });
 });
+
+describe("call ↔ createDoorHandlers over a real TCP socket (host:port)", () => {
+  let server: { stop: () => void; port: number } | undefined;
+  afterEach(() => { server?.stop(); });
+
+  test("round-trips over a host:port endpoint", async () => {
+    server = Bun.listen({
+      hostname: "127.0.0.1",
+      port: 0, // ephemeral
+      socket: createDoorHandlers("test", {
+        echo: (p) => ({ echoed: p.value }),
+      }, noop),
+    }) as unknown as { stop: () => void; port: number };
+
+    const res = await call<{ echoed: unknown }>(`127.0.0.1:${server.port}`, "echo", { value: 9 });
+    expect(res).toEqual({ echoed: 9 });
+  });
+});

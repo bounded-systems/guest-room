@@ -158,13 +158,31 @@ async function handleLine(
 // ── Client helper ───────────────────────────────────────────────────────────
 
 /**
- * Send a request to a door daemon and wait for the response.
+ * Resolve a door endpoint to a Bun.connect target. A leading "/" (optionally
+ * `unix://`) is a unix socket path; otherwise `host:port` (optionally `tcp://`)
+ * is a TCP target — so the same client reaches a mounted unix socket (Linux/pod)
+ * or a host-gateway / pod-local TCP port (e.g. macOS, where virtiofs can't share
+ * a unix socket across the host↔VM boundary). A path containing ":" stays unix.
+ */
+function connectTarget(endpoint: string): { unix: string } | { hostname: string; port: number } {
+  const stripped = endpoint.replace(/^unix:\/\//, "");
+  if (!stripped.startsWith("/")) {
+    const m = stripped.replace(/^tcp:\/\//, "").match(/^([^/\s]+):(\d{1,5})$/);
+    if (m) return { hostname: m[1]!, port: Number(m[2]) };
+  }
+  return { unix: stripped };
+}
+
+/**
+ * Send a request to a door daemon and wait for the response. The endpoint is a
+ * unix socket path or a `host:port` TCP target (see {@link connectTarget}).
  *
  * @example
  *   const result = await call("/run/myservice.sock", "greet", { name: "world" });
+ *   const viaTcp = await call("host.containers.internal:3002", "greet", { name: "world" });
  */
 export async function call<T = unknown>(
-  socketPath: string,
+  endpoint: string,
   method: string,
   params: Record<string, unknown> = {},
 ): Promise<T> {
@@ -174,7 +192,7 @@ export async function call<T = unknown>(
   return new Promise((resolve, reject) => {
     let buffer = "";
     const socket = Bun.connect({
-      unix: socketPath,
+      ...connectTarget(endpoint),
       socket: {
         data(_socket, chunk) {
           buffer += Buffer.from(chunk).toString("utf-8");
