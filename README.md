@@ -9,7 +9,7 @@ Everything the box can reach, the agent can reach.
 Draw the boundary one level in, at the **door** — a named, scope-bounded set of
 capabilities an agent acts through, where the mechanism (not the agent's good
 intentions) enforces the ceiling, and the privileged effects that cross it are
-attributable to a signed owner. The door — not the process, not the container — is
+attributable to a signed owner. The ceiling is enforced today; signed provenance is the layer above it. The door — not the process, not the container — is
 **the unit of bounded authority**.
 
 **guest-room** is the runtime that makes a door a real, testable object: its
