@@ -1,5 +1,29 @@
 # guest-room
 
+As agents begin doing real engineering work, the hard question stops being how
+capable the model is — it's what a given agent is *allowed* to do, and who answers
+for what it did. Today that boundary is drawn at the process or the container: a
+box that confines *where* an agent runs but not *what authority* it wields inside.
+Everything the box can reach, the agent can reach.
+
+Draw the boundary one level in, at the **door** — a named, scope-bounded set of
+capabilities an agent acts through, where the mechanism (not the agent's good
+intentions) enforces the ceiling, and the privileged effects that cross it are
+attributable to a signed owner. The door — not the process, not the container — is
+**the unit of bounded authority**.
+
+**guest-room** is the runtime that makes a door a real, testable object: its
+capabilities are pinned as specs that run. **claude-box** is one guest — Claude
+Code — plugged into it. The bet: as the number of agents and the stack of
+abstractions under them multiply, what keeps them honest isn't a smarter sandbox —
+it's authority that stays bounded and attributable at the door.
+
+*In the object-capability tradition (POLA; cf. SES/Endo, and Cap'n Proto for
+addressing), with macaroon-style append-only caveat attenuation and lease-bound
+confinement.*
+
+---
+
 A **guest-agnostic room+door capability runtime**. It is the general thing
 [`claude-box`](https://github.com/bounded-systems/claude-box) turned out to be
 built on: nothing in here knows or cares who the guest is.
