@@ -18,5 +18,12 @@
   },
   "scripts": {
     "test": "bun test"
+  },
+  "bounded": {
+    "tagline": "Guest-agnostic room+door capability runtime — the core library claude-box is built on",
+    "kind": "room",
+    "facet": "verb",
+    "role": "runtime",
+    "domain": "capability/model"
   }
 }
