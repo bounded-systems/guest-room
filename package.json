@@ -1,6 +1,6 @@
 {
   "name": "@bounded-systems/guest-room",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": false,
   "type": "module",
   "description": "Guest-agnostic room+door capability runtime — the core library claude-box is built on.",

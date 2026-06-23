@@ -1,4 +1,5 @@
 /**
+ * @module
  * gherkin.ts — a tiny Gherkin-subset runner.
  *
  * The point: the .feature files in ./features are not prose ABOUT the engine —

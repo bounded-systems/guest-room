@@ -1,4 +1,5 @@
 /**
+ * @module
  * door-protocol.ts — the generic door protocol (JSON-over-socket).
  *
  * Every door daemon speaks the same wire format:

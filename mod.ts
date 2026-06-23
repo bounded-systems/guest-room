@@ -1,4 +1,5 @@
 /**
+ * @module
  * guest-room — a guest-agnostic room+door capability runtime.
  *
  * This module knows nothing about any particular guest: no guest identity, no

@@ -1,4 +1,5 @@
 /**
+ * @module
  * daemon.ts — shared utilities for door daemons.
  *
  * Every daemon follows the same pattern:
