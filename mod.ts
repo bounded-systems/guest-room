@@ -68,6 +68,7 @@ export function transportString(t: DoorTransport): string {
   }
 }
 
+/** Environment variables (a map of names to values or undefined). */
 export type Env = Record<string, string | undefined>;
 
 /** Default host socket for a daemon, private-dir-first. Pure (no I/O) so door
@@ -252,6 +253,7 @@ export type AttenuationViolation =
   | { door: string; reason: "absent-in-parent" }
   | { door: string; reason: "widened-caveats"; dropped: string[] };
 
+/** The verdict of `attenuatesDoors`: true if child is a valid attenuation of parent, false with violations. */
 export type AttenuationVerdict =
   | { ok: true }
   | { ok: false; violations: AttenuationViolation[] };

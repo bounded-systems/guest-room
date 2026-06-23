@@ -9,8 +9,11 @@
 // And/But. Tag lines (@…), comments (#…) and free-text description lines are
 // ignored. No Scenario Outline / tables / doc-strings (kept deliberately small).
 
+/** A single step within a scenario: keyword (Given/When/Then/And/But) and text. */
 export type Step = { keyword: string; text: string };
+/** A scenario: a named sequence of steps. */
 export type Scenario = { name: string; steps: Step[] };
+/** A feature: a name and collection of scenarios. */
 export type Feature = { name: string; scenarios: Scenario[] };
 
 const STEP_RE = /^(Given|When|Then|And|But)\s+(.*)$/;
@@ -42,6 +45,7 @@ export function parseFeature(src: string): Feature {
 
 /** A step's world: a mutable bag the steps of one scenario share. */
 export type World = Record<string, unknown>;
+/** A step function: takes a world and captured regex groups, executes sync or async. */
 export type StepFn = (world: World, ...args: string[]) => void | Promise<void>;
 
 /** A registry of step definitions: regex → function. Step keyword (Given/When/
@@ -50,6 +54,7 @@ export type StepFn = (world: World, ...args: string[]) => void | Promise<void>;
 export class StepRegistry {
   private defs: { re: RegExp; fn: StepFn }[] = [];
 
+  /** Register a step definition: a regex pattern and the function that executes it. */
   step(pattern: RegExp, fn: StepFn): this {
     this.defs.push({ re: pattern, fn });
     return this;

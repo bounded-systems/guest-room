@@ -21,7 +21,9 @@ import { Buffer } from "node:buffer";
 /** The subset of a connection socket the server handlers use: a per-connection
  *  `data` bag plus `write`. Bun's `Socket<Cx>` is structurally assignable. */
 export interface DoorSocket<Cx> {
+  /** Per-connection state bag (context data). */
   data: Cx;
+  /** Write data (string or bytes) to the socket; returns bytes written. */
   write(data: string | Uint8Array): number;
 }
 
@@ -48,12 +50,14 @@ declare const Bun: {
 
 // ── Protocol types (shared across all doors) ────────────────────────────────
 
+/** JSON-RPC 2.0-like request envelope: method call with id, method name, and optional params. */
 export type RequestEnvelope = {
   id: string;
   method: string;
   params?: Record<string, unknown>;
 };
 
+/** Response envelope: result (if ok=true) or error object (if ok=false). */
 export type ResponseEnvelope = {
   id: string;
   ok: boolean;
@@ -75,10 +79,12 @@ export function err(id: string, code: string, message: string): ResponseEnvelope
 
 // ── Connection handler ──────────────────────────────────────────────────────
 
+/** A method handler: takes params and returns a result (sync or async). */
 export type MethodHandler = (
   params: Record<string, unknown>,
 ) => Promise<unknown> | unknown;
 
+/** Registry of method handlers (name → handler). */
 export type MethodRegistry = Record<string, MethodHandler>;
 
 /**
