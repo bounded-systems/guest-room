@@ -1,0 +1,10 @@
+{
+  "name": {
+    "type": "name",
+    "value": "Guest Room"
+  },
+  "description": {
+    "type": "meta",
+    "value": "Guest-agnostic room+door capability runtime — the core library claude-box is built on."
+  }
+}
