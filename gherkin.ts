@@ -1,13 +1,15 @@
-// gherkin.ts — a tiny Gherkin-subset runner.
-//
-// The point: the .feature files in ./features are not prose ABOUT the engine —
-// they EXECUTE against it (guest-room/mod.ts), as steps wired in the test file.
-// So the documentation originates from the code and cannot drift: if a feature
-// describes behavior the engine doesn't have, the test goes red.
-//
-// Supported subset: Feature, Scenario, and the step keywords Given/When/Then/
-// And/But. Tag lines (@…), comments (#…) and free-text description lines are
-// ignored. No Scenario Outline / tables / doc-strings (kept deliberately small).
+/**
+ * gherkin.ts — a tiny Gherkin-subset runner.
+ *
+ * The point: the .feature files in ./features are not prose ABOUT the engine —
+ * they EXECUTE against it (guest-room/mod.ts), as steps wired in the test file.
+ * So the documentation originates from the code and cannot drift: if a feature
+ * describes behavior the engine doesn't have, the test goes red.
+ *
+ * Supported subset: Feature, Scenario, and the step keywords Given/When/Then/
+ * And/But. Tag lines (@…), comments (#…) and free-text description lines are
+ * ignored. No Scenario Outline / tables / doc-strings (kept deliberately small).
+ */
 
 /** A single step within a scenario: keyword (Given/When/Then/And/But) and text. */
 export type Step = { keyword: string; text: string };

@@ -1,24 +1,26 @@
-// guest-room — a guest-agnostic room+door capability runtime.
-//
-// This module knows nothing about any particular guest: no guest identity, no
-// image, no container runtime. A ROOM is walls plus a furnished set of DOORS; a
-// DOOR is a single (name, socket) capability brokered by a daemon that holds the
-// authority the room never does. A door may be ATTENUATED — narrowed by opaque
-// caveats the broker enforces — and attenuation is append-only, so a door can
-// only ever be handed onward equally or more restricted, never wider. The room
-// hands its guest a RULEBOOK keyed to exactly the doors present — a card per
-// granted door (how to use it, and any restriction on it) and a card per denied
-// door (there is no rule; do not attempt).
-//
-// A consumer supplies the door CATALOG and the room bundles; guest-room resolves
-// grants, derives the honest granted/denied surface, and renders the rulebook
-// lines. The consumer keeps its own launch mechanics (which runtime, which
-// image, how state mounts) — those are the guest, not the room.
-//
-// Extraction note: this directory is a self-contained internal dependency. When
-// it graduates to its own repo, it moves as-is and consumers flip the import
-// path; nothing here names a guest — a test enforces that the engine source is
-// guest-agnostic, so the seam can't silently re-couple.
+/**
+ * guest-room — a guest-agnostic room+door capability runtime.
+ *
+ * This module knows nothing about any particular guest: no guest identity, no
+ * image, no container runtime. A ROOM is walls plus a furnished set of DOORS; a
+ * DOOR is a single (name, socket) capability brokered by a daemon that holds the
+ * authority the room never does. A door may be ATTENUATED — narrowed by opaque
+ * caveats the broker enforces — and attenuation is append-only, so a door can
+ * only ever be handed onward equally or more restricted, never wider. The room
+ * hands its guest a RULEBOOK keyed to exactly the doors present — a card per
+ * granted door (how to use it, and any restriction on it) and a card per denied
+ * door (there is no rule; do not attempt).
+ *
+ * A consumer supplies the door CATALOG and the room bundles; guest-room resolves
+ * grants, derives the honest granted/denied surface, and renders the rulebook
+ * lines. The consumer keeps its own launch mechanics (which runtime, which
+ * image, how state mounts) — those are the guest, not the room.
+ *
+ * Extraction note: this directory is a self-contained internal dependency. When
+ * it graduates to its own repo, it moves as-is and consumers flip the import
+ * path; nothing here names a guest — a test enforces that the engine source is
+ * guest-agnostic, so the seam can't silently re-couple.
+ */
 
 /** A door name lands in a mount path (`/run/<name>.sock`) and an env var, so it
  *  must be path-safe — no `/`, no `..`, no injection into the mount spec. */
