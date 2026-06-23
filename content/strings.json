@@ -3,8 +3,12 @@
     "type": "name",
     "value": "Guest Room"
   },
+  "tagline": {
+    "type": "tagline",
+    "value": "guest-room scopes what an agent is allowed to do, and refuses everything else by construction — not by a reminder you…"
+  },
   "description": {
     "type": "meta",
-    "value": "Guest-agnostic room+door capability runtime — the core library claude-box is built on."
+    "value": "guest-room scopes what an agent is allowed to do, and refuses everything else by construction — not by a reminder you hope it reads.  I built it for my own work.  I wanted an agent that did the task and didn't get distracted or reach for things I never granted it."
   }
 }
