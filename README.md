@@ -169,6 +169,7 @@ docs cannot drift from the code.
 | Attenuation is append-only — authority never widens | `features/attenuation.feature` → `attenuate` / `attenuatesDoors` | `5a44110` |
 | A capability dies with its lease and never exceeds its ceiling | `features/confinement.feature` → `isConfined` / `resolveProvider` | `5a44110` |
 | The engine names no guest, so it works for any agent | `guest-room.test.ts` ("names no guest") | `5a44110` |
+| A door's authority is the same object across unix/vsock/tcp wires | `features/transport.feature` → `unix`/`vsock`/`tcp` / `transportString` / `resolveDoor` in `mod.ts` | `877a11b` |
 
 ```sh
 bun test
