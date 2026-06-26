@@ -12,6 +12,7 @@
  */
 
 import { Buffer } from "node:buffer";
+import { createHmac } from "node:crypto";
 
 // This module's server half is transport-neutral; its client half (`call`)
 // targets Bun's socket API. Rather than depend on `@types/bun` (a bare "bun"
@@ -109,11 +110,59 @@ export function constantTimeEqual(a: string, b: string): boolean {
  *  exactly `expected` in its `auth` field (constant-time compared). This is the
  *  per-launch token a tcp/vsock door needs so only the intended guest can knock —
  *  the wire-level stand-in for the kernel peer-authentication a unix socket gives
- *  for free. An HMAC-per-request authorizer is a drop-in replacement: same
- *  signature, but it verifies `req.auth` as a MAC over the request rather than a
- *  fixed secret, which also defeats replay. */
+ *  for free. It proves possession of the secret, but the secret travels on every
+ *  request, so a captured request can be REPLAYED verbatim. {@link hmacAuthorizer}
+ *  closes that — same signature, stronger proof. */
 export function tokenAuthorizer(expected: string): RequestAuthorizer {
   return (req) => typeof req.auth === "string" && constantTimeEqual(req.auth, expected);
+}
+
+/** The bytes an HMAC signs: the request's identity-bearing content, with object
+ *  keys sorted so client and server canonicalize identically. `auth` itself is
+ *  excluded (it's the signature). Including `id` (a fresh per-request UUID) binds
+ *  the signature to THIS request, which is what makes replay detectable. */
+export function canonicalRequest(req: RequestEnvelope): string {
+  return stableStringify({ id: req.id, method: req.method, params: req.params ?? {} });
+}
+
+/** Deterministic JSON: object keys sorted recursively, so the same logical value
+ *  always serializes to the same string (plain JSON.stringify is key-order
+ *  dependent, which would make two equal requests produce different MACs). */
+function stableStringify(v: unknown): string {
+  if (v === null || typeof v !== "object") return JSON.stringify(v) ?? "null";
+  if (Array.isArray(v)) return "[" + v.map(stableStringify).join(",") + "]";
+  const o = v as Record<string, unknown>;
+  return "{" + Object.keys(o).sort().map((k) => JSON.stringify(k) + ":" + stableStringify(o[k])).join(",") + "}";
+}
+
+/** A client-side signer for `call`'s `sign` option: produces the hex HMAC-SHA256
+ *  of {@link canonicalRequest} under the per-launch `key`. Pair it with
+ *  {@link hmacAuthorizer} holding the same key on the broker. */
+export function hmacSigner(key: string): (req: RequestEnvelope) => string {
+  return (req) => createHmac("sha256", key).update(canonicalRequest(req)).digest("hex");
+}
+
+/** An HMAC-per-request {@link RequestAuthorizer}: accept a request iff its `auth`
+ *  is a valid HMAC-SHA256 of the request content under `key` AND its `id` has not
+ *  been seen before. The key never travels — only a signature over THIS request —
+ *  so a captured request can't be reused (the signature is right, but its `id` is
+ *  already spent) and can't be tampered (any change to method/params breaks the
+ *  MAC). Replay state is the broker's: a bounded FIFO of recent ids (`replayCap`,
+ *  default 4096); on a per-launch key this is all the window you need. */
+export function hmacAuthorizer(key: string, opts: { replayCap?: number } = {}): RequestAuthorizer {
+  const cap = opts.replayCap ?? 4096;
+  const seen = new Set<string>();
+  const order: string[] = [];
+  return (req) => {
+    if (typeof req.auth !== "string") return false;
+    const expected = createHmac("sha256", key).update(canonicalRequest(req)).digest("hex");
+    if (!constantTimeEqual(req.auth, expected)) return false;
+    if (seen.has(req.id)) return false; // replay: this request was already served
+    seen.add(req.id);
+    order.push(req.id);
+    if (order.length > cap) seen.delete(order.shift()!);
+    return true;
+  };
 }
 
 // ── Connection handler ──────────────────────────────────────────────────────
@@ -240,23 +289,28 @@ function connectTarget(endpoint: string): { unix: string } | { hostname: string;
  * Send a request to a door daemon and wait for the response. The endpoint is a
  * unix socket path or a `host:port` TCP target (see {@link connectTarget}).
  *
- * Pass `opts.auth` to carry a per-request authenticator (a bearer token, or an
- * HMAC over the request) — required by a broker that fronts a tcp/vsock door
- * with a {@link tokenAuthorizer}; harmless (ignored) on an unauthenticated unix
+ * Authenticate against a broker that fronts a tcp/vsock door: pass a fixed
+ * `opts.auth` bearer token (matched by {@link tokenAuthorizer}), or — preferred —
+ * `opts.sign` to compute a per-request signature over the assembled envelope
+ * (use {@link hmacSigner}, matched by {@link hmacAuthorizer}). `sign` takes
+ * precedence over `auth`. Both are harmless (ignored) on an unauthenticated unix
  * door.
  *
  * @example
  *   const result = await call("/run/myservice.sock", "greet", { name: "world" });
- *   const viaTcp = await call("host.containers.internal:3002", "greet", { name: "world" }, { auth: token });
+ *   const viaTcp  = await call("host.containers.internal:3002", "greet", { name: "world" }, { auth: token });
+ *   const signed  = await call("host.containers.internal:3002", "greet", { name: "world" }, { sign: hmacSigner(key) });
  */
 export async function call<T = unknown>(
   endpoint: string,
   method: string,
   params: Record<string, unknown> = {},
-  opts: { auth?: string } = {},
+  opts: { auth?: string; sign?: (req: RequestEnvelope) => string } = {},
 ): Promise<T> {
   const id = crypto.randomUUID();
-  const req: RequestEnvelope = { id, method, params, ...(opts.auth !== undefined ? { auth: opts.auth } : {}) };
+  const req: RequestEnvelope = { id, method, params };
+  const auth = opts.sign ? opts.sign(req) : opts.auth;
+  if (auth !== undefined) req.auth = auth;
 
   return new Promise((resolve, reject) => {
     let buffer = "";
