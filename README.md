@@ -170,6 +170,7 @@ docs cannot drift from the code.
 | A capability dies with its lease and never exceeds its ceiling | `features/confinement.feature` → `isConfined` / `resolveProvider` | `5a44110` |
 | The engine names no guest, so it works for any agent | `guest-room.test.ts` ("names no guest") | `5a44110` |
 | A door's authority is the same object across unix/vsock/tcp wires | `features/transport.feature` → `unix`/`vsock`/`tcp` / `transportString` / `resolveDoor` in `mod.ts` | `877a11b` |
+| The algebra holds for EVERY case, not just examples (attenuation ≡ superset; enforcement is fail-closed and monotone; confinement is ceiling-bound + lease-gated) | `algebra-proofs.test.ts` (bounded model checking by exhaustion) | `412b3f2` |
 
 ```sh
 bun test
