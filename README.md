@@ -175,6 +175,7 @@ docs cannot drift from the code.
 | A door's authority is the same object across unix/vsock/tcp wires | `features/transport.feature` → `unix`/`vsock`/`tcp` / `transportString` / `resolveDoor` in `mod.ts` | `877a11b` |
 | The algebra holds for EVERY case, not just examples (attenuation ≡ superset; enforcement is fail-closed and monotone; confinement is ceiling-bound + lease-gated) | `algebra-proofs.test.ts` (bounded model checking by exhaustion) | `412b3f2` |
 | A tcp/vsock door can require a per-launch token; unauthorized peers reach no handler (fail closed) | `protocol.test.ts` → `tokenAuthorizer` / `RequestAuthorizer` in `protocol.ts` | `f32b08e` |
+| A per-request HMAC door rejects tampered, wrong-key, and replayed requests | `protocol.test.ts` → `hmacSigner` / `hmacAuthorizer` / `canonicalRequest` in `protocol.ts` | `c487d4e` |
 
 ```sh
 bun test
