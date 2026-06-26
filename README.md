@@ -91,7 +91,9 @@ lets the broker read the peer's kernel credentials (`SO_PEERCRED` on Linux,
 *who* knocked. A vsock identifies the peer VM by CID. A tcp port carries no peer
 identity at all: anyone who can route to it can knock. So moving a door to tcp
 *loses* the authentication the kernel gave you for free, and the broker must
-replace it on the wire (a per-launch token in the request envelope). The engine
+replace it on the wire (a per-launch token in the request envelope — `protocol.ts`
+ships a fail-closed `tokenAuthorizer` for exactly this; an HMAC-per-request form
+that also defeats replay is a drop-in at the same seam). The engine
 carries the transport; the broker enforces the trust — the full reduction is in
 [`docs/authority-and-attenuation.md`](docs/authority-and-attenuation.md).
 
@@ -171,6 +173,7 @@ docs cannot drift from the code.
 | The engine names no guest, so it works for any agent | `guest-room.test.ts` ("names no guest") | `5a44110` |
 | A door's authority is the same object across unix/vsock/tcp wires | `features/transport.feature` → `unix`/`vsock`/`tcp` / `transportString` / `resolveDoor` in `mod.ts` | `877a11b` |
 | The algebra holds for EVERY case, not just examples (attenuation ≡ superset; enforcement is fail-closed and monotone; confinement is ceiling-bound + lease-gated) | `algebra-proofs.test.ts` (bounded model checking by exhaustion) | `412b3f2` |
+| A tcp/vsock door can require a per-launch token; unauthorized peers reach no handler (fail closed) | `protocol.test.ts` → `tokenAuthorizer` / `RequestAuthorizer` in `protocol.ts` | `f32b08e` |
 
 ```sh
 bun test

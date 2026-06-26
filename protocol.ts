@@ -56,6 +56,13 @@ export type RequestEnvelope = {
   id: string;
   method: string;
   params?: Record<string, unknown>;
+  /** Optional per-request authenticator. On a unix socket the kernel vouches for
+   *  the peer (filesystem perms + peer credentials), so this is unused; on a
+   *  tcp/vsock door — where the kernel gives no peer identity — the broker can
+   *  require it (see {@link tokenAuthorizer}) so "only the intended guest can
+   *  knock" survives the move off the filesystem. A bearer token today; an
+   *  HMAC-over-the-request later, same field. */
+  auth?: string;
 };
 
 /** Response envelope: result (if ok=true) or error object (if ok=false). */
@@ -78,6 +85,37 @@ export function err(id: string, code: string, message: string): ResponseEnvelope
   return { id, ok: false, error: { code, message } };
 }
 
+// ── Authentication helpers ───────────────────────────────────────────────────
+// A unix-socket door is authenticated by the kernel: filesystem permissions gate
+// it and the broker can read the peer's credentials. A tcp/vsock door has no such
+// gate — anyone who can route to it can connect — so the authority a unix socket
+// carried for free has to be reconstructed on the wire. These give a broker a
+// minimal, fail-closed way to do that. The grammar is intentionally tiny; the
+// engine of policy stays the broker's.
+
+/** Constant-time string equality: compares every byte regardless of where the
+ *  first difference falls, so comparison time doesn't leak how much of a secret
+ *  matched. Unequal lengths return false without short-circuiting on content. */
+export function constantTimeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a, "utf-8");
+  const bb = Buffer.from(b, "utf-8");
+  let diff = ab.length ^ bb.length;
+  const len = Math.max(ab.length, bb.length);
+  for (let i = 0; i < len; i++) diff |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
+  return diff === 0;
+}
+
+/** A bearer-token {@link RequestAuthorizer}: accept a request iff it carries
+ *  exactly `expected` in its `auth` field (constant-time compared). This is the
+ *  per-launch token a tcp/vsock door needs so only the intended guest can knock —
+ *  the wire-level stand-in for the kernel peer-authentication a unix socket gives
+ *  for free. An HMAC-per-request authorizer is a drop-in replacement: same
+ *  signature, but it verifies `req.auth` as a MAC over the request rather than a
+ *  fixed secret, which also defeats replay. */
+export function tokenAuthorizer(expected: string): RequestAuthorizer {
+  return (req) => typeof req.auth === "string" && constantTimeEqual(req.auth, expected);
+}
+
 // ── Connection handler ──────────────────────────────────────────────────────
 
 /** A method handler: takes params and returns a result (sync or async). */
@@ -87,6 +125,13 @@ export type MethodHandler = (
 
 /** Registry of method handlers (name → handler). */
 export type MethodRegistry = Record<string, MethodHandler>;
+
+/** Decides whether a parsed request is allowed to be served at all — checked
+ *  BEFORE method dispatch, so an unauthenticated peer reaches no handler. The
+ *  broker supplies it (the policy is the broker's); when omitted, no
+ *  authentication is required and every well-formed request is dispatched (the
+ *  unix-socket default, where the kernel already authenticated the peer). */
+export type RequestAuthorizer = (req: RequestEnvelope) => boolean;
 
 /**
  * Create socket handlers for a door daemon.
@@ -101,6 +146,7 @@ export function createDoorHandlers<Cx extends { buffer: string }>(
   name: string,
   methods: MethodRegistry,
   log: (level: "INFO" | "ERR" | "ALLOW" | "DENY" | "WARN", msg: string) => void,
+  authorize?: RequestAuthorizer,
 ): {
   open: (socket: DoorSocket<Cx>) => void;
   data: (socket: DoorSocket<Cx>, chunk: Uint8Array) => void;
@@ -119,7 +165,7 @@ export function createDoorHandlers<Cx extends { buffer: string }>(
 
       for (const line of lines) {
         if (!line.trim()) continue;
-        const response = await handleLine(line, methods, log);
+        const response = await handleLine(line, methods, log, authorize);
         socket.write(JSON.stringify(response) + "\n");
       }
     },
@@ -138,12 +184,22 @@ async function handleLine(
   line: string,
   methods: MethodRegistry,
   log: (level: "INFO" | "ERR" | "ALLOW" | "DENY" | "WARN", msg: string) => void,
+  authorize?: RequestAuthorizer,
 ): Promise<ResponseEnvelope> {
   let req: RequestEnvelope;
   try {
     req = JSON.parse(line) as RequestEnvelope;
   } catch {
     return err("?", "PARSE_ERROR", "invalid JSON");
+  }
+
+  // Authenticate before dispatch — an unauthorized peer must reach no handler.
+  // Fail-closed: if the broker required auth, a request that doesn't satisfy it
+  // is denied without leaking why (no method/handler probing). When no authorizer
+  // is configured, every well-formed request proceeds (unix-socket default).
+  if (authorize && !authorize(req)) {
+    log("DENY", `unauthenticated request: ${req.method}`);
+    return err(req.id, "UNAUTHENTICATED", "request rejected");
   }
 
   const handler = methods[req.method];
@@ -184,17 +240,23 @@ function connectTarget(endpoint: string): { unix: string } | { hostname: string;
  * Send a request to a door daemon and wait for the response. The endpoint is a
  * unix socket path or a `host:port` TCP target (see {@link connectTarget}).
  *
+ * Pass `opts.auth` to carry a per-request authenticator (a bearer token, or an
+ * HMAC over the request) — required by a broker that fronts a tcp/vsock door
+ * with a {@link tokenAuthorizer}; harmless (ignored) on an unauthenticated unix
+ * door.
+ *
  * @example
  *   const result = await call("/run/myservice.sock", "greet", { name: "world" });
- *   const viaTcp = await call("host.containers.internal:3002", "greet", { name: "world" });
+ *   const viaTcp = await call("host.containers.internal:3002", "greet", { name: "world" }, { auth: token });
  */
 export async function call<T = unknown>(
   endpoint: string,
   method: string,
   params: Record<string, unknown> = {},
+  opts: { auth?: string } = {},
 ): Promise<T> {
   const id = crypto.randomUUID();
-  const req: RequestEnvelope = { id, method, params };
+  const req: RequestEnvelope = { id, method, params, ...(opts.auth !== undefined ? { auth: opts.auth } : {}) };
 
   return new Promise((resolve, reject) => {
     let buffer = "";
