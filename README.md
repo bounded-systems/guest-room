@@ -213,6 +213,9 @@ guest-room/
   canon above (per spec: proven in-engine vs. deferred vs. the real gap), the
   algebra theorems now proven by exhaustion (`algebra-proofs.test.ts`), and the
   verification roadmap (what to reach for next, in TS or Rust).
+- [`docs/building-guest-room.md`](docs/building-guest-room.md) — a short builder's
+  retrospective: the problem, what got built, the hard part (and what I cut), and
+  what it left behind.
 
 In the object-capability tradition (POLA), with macaroon-style append-only caveat
 attenuation and lease-bound confinement.
