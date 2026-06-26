@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 import { unlinkSync } from "node:fs";
 import {
   ok, err, createDoorHandlers, call,
+  constantTimeEqual, tokenAuthorizer,
   type ResponseEnvelope,
 } from "./protocol.ts";
 
@@ -78,6 +79,50 @@ describe("createDoorHandlers (server side)", () => {
   });
 });
 
+describe("wire-token authentication (the tcp/vsock peer-identity stand-in)", () => {
+  const TOKEN = "s3cret-per-launch-token";
+  const handlers = createDoorHandlers(
+    "test",
+    { greet: (p) => ({ message: `hello ${p.name}` }) },
+    noop,
+    tokenAuthorizer(TOKEN),
+  );
+  const feed = async (fs: ReturnType<typeof fakeSocket>, line: string) =>
+    handlers.data(fs.socket, new TextEncoder().encode(line));
+
+  test("a request with the right token is served", async () => {
+    const fs = fakeSocket(); handlers.open(fs.socket);
+    await feed(fs, JSON.stringify({ id: "1", method: "greet", params: { name: "world" }, auth: TOKEN }) + "\n");
+    expect(fs.replies()[0]).toEqual({ id: "1", ok: true, result: { message: "hello world" } });
+  });
+
+  test("a wrong token → UNAUTHENTICATED, and reaches no handler", async () => {
+    const fs = fakeSocket(); handlers.open(fs.socket);
+    await feed(fs, JSON.stringify({ id: "2", method: "greet", params: { name: "x" }, auth: "wrong" }) + "\n");
+    expect(fs.replies()[0]).toMatchObject({ id: "2", ok: false, error: { code: "UNAUTHENTICATED" } });
+  });
+
+  test("a missing token → UNAUTHENTICATED (fail closed)", async () => {
+    const fs = fakeSocket(); handlers.open(fs.socket);
+    await feed(fs, JSON.stringify({ id: "3", method: "greet", params: { name: "x" } }) + "\n");
+    expect(fs.replies()[0]).toMatchObject({ id: "3", ok: false, error: { code: "UNAUTHENTICATED" } });
+  });
+
+  test("no authorizer configured → backward compatible (auth not required)", async () => {
+    const open = createDoorHandlers("test", { greet: (p) => ({ message: `hi ${p.name}` }) }, noop);
+    const fs = fakeSocket(); open.open(fs.socket);
+    await open.data(fs.socket, new TextEncoder().encode(JSON.stringify({ id: "4", method: "greet", params: { name: "y" } }) + "\n"));
+    expect(fs.replies()[0]).toEqual({ id: "4", ok: true, result: { message: "hi y" } });
+  });
+
+  test("constantTimeEqual: equal iff identical, length-mismatch safe", () => {
+    expect(constantTimeEqual("abc", "abc")).toBe(true);
+    expect(constantTimeEqual("abc", "abd")).toBe(false);
+    expect(constantTimeEqual("abc", "abcd")).toBe(false);
+    expect(constantTimeEqual("", "")).toBe(true);
+  });
+});
+
 describe("call ↔ createDoorHandlers over a real unix socket", () => {
   let sockPath = "";
   let server: { stop: () => void } | undefined;
@@ -115,5 +160,21 @@ describe("call ↔ createDoorHandlers over a real TCP socket (host:port)", () =>
 
     const res = await call<{ echoed: unknown }>(`127.0.0.1:${server.port}`, "echo", { value: 9 });
     expect(res).toEqual({ echoed: 9 });
+  });
+
+  test("an authenticated tcp door: the right token round-trips, a wrong one is rejected", async () => {
+    const TOKEN = "launch-token-xyz";
+    server = Bun.listen({
+      hostname: "127.0.0.1",
+      port: 0,
+      socket: createDoorHandlers("test", { echo: (p) => ({ echoed: p.value }) }, noop, tokenAuthorizer(TOKEN)),
+    }) as unknown as { stop: () => void; port: number };
+    const ep = `127.0.0.1:${server.port}`;
+
+    const ok = await call<{ echoed: unknown }>(ep, "echo", { value: 11 }, { auth: TOKEN });
+    expect(ok).toEqual({ echoed: 11 });
+
+    await expect(call(ep, "echo", { value: 11 }, { auth: "nope" })).rejects.toThrow();
+    await expect(call(ep, "echo", { value: 11 })).rejects.toThrow(); // no token at all
   });
 });

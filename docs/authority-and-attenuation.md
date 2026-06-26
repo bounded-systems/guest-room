@@ -163,6 +163,12 @@ So a door that moves from a unix socket to a tcp port (e.g. to cross a microVM
 boundary on a substrate that can't share a unix socket host↔guest) silently loses
 its peer-authentication unless the broker **replaces it on the wire** — a
 per-launch bearer token in the request envelope, or per-peer interface binding.
+The wire protocol now carries the mechanism for this: `RequestEnvelope.auth`
+plus a fail-closed `RequestAuthorizer` checked *before* dispatch, with a
+constant-time `tokenAuthorizer` for the bearer-token case (`protocol.ts`,
+*Authentication helpers*) — an HMAC-per-request authorizer (which also defeats
+replay) is a drop-in at the same seam. The *policy* (which token is valid) stays
+the broker's; the engine still never interprets it.
 This is a genuine TCB line, and it is the substrate's / broker's, not the engine's:
 the engine deliberately carries the transport without interpreting its trust, the
 same separation that keeps it guest-agnostic. The honest rule: *the rulebook's
