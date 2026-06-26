@@ -203,6 +203,10 @@ guest-room/
 - [`docs/authority-and-attenuation.md`](docs/authority-and-attenuation.md) — what
   guest-room proves about authority, what it defers to the substrate, and where a
   provenance layer fits above it.
+- [`docs/scorecard.md`](docs/scorecard.md) — an honest self-rating against the
+  canon above (per spec: proven in-engine vs. deferred vs. the real gap), the
+  algebra theorems now proven by exhaustion (`algebra-proofs.test.ts`), and the
+  verification roadmap (what to reach for next, in TS or Rust).
 
 In the object-capability tradition (POLA), with macaroon-style append-only caveat
 attenuation and lease-bound confinement.
