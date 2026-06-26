@@ -10,7 +10,8 @@ import { unlinkSync } from "node:fs";
 import {
   ok, err, createDoorHandlers, call,
   constantTimeEqual, tokenAuthorizer,
-  type ResponseEnvelope,
+  hmacSigner, hmacAuthorizer, canonicalRequest,
+  type ResponseEnvelope, type RequestEnvelope,
 } from "./protocol.ts";
 
 const noop = () => {};
@@ -123,6 +124,62 @@ describe("wire-token authentication (the tcp/vsock peer-identity stand-in)", () 
   });
 });
 
+describe("HMAC-per-request authentication (authenticity + integrity + anti-replay)", () => {
+  const KEY = "per-launch-shared-key";
+  const sign = hmacSigner(KEY);
+  const handlers = createDoorHandlers(
+    "test",
+    { greet: (p) => ({ message: `hello ${p.name}` }) },
+    noop,
+    hmacAuthorizer(KEY),
+  );
+  const feed = async (fs: ReturnType<typeof fakeSocket>, req: RequestEnvelope) =>
+    handlers.data(fs.socket, new TextEncoder().encode(JSON.stringify(req) + "\n"));
+  const signed = (id: string, name: string): RequestEnvelope => {
+    const req: RequestEnvelope = { id, method: "greet", params: { name } };
+    req.auth = sign(req);
+    return req;
+  };
+
+  test("a correctly signed request is served", async () => {
+    const fs = fakeSocket(); handlers.open(fs.socket);
+    await feed(fs, signed("a", "world"));
+    expect(fs.replies()[0]).toEqual({ id: "a", ok: true, result: { message: "hello world" } });
+  });
+
+  test("a tampered request (params changed after signing) → UNAUTHENTICATED", async () => {
+    const fs = fakeSocket(); handlers.open(fs.socket);
+    const req = signed("b", "world");
+    (req.params as { name: string }).name = "attacker"; // mutate after the MAC was computed
+    await feed(fs, req);
+    expect(fs.replies()[0]).toMatchObject({ id: "b", ok: false, error: { code: "UNAUTHENTICATED" } });
+  });
+
+  test("a signature under the wrong key → UNAUTHENTICATED", async () => {
+    const fs = fakeSocket(); handlers.open(fs.socket);
+    const req: RequestEnvelope = { id: "c", method: "greet", params: { name: "x" } };
+    req.auth = hmacSigner("wrong-key")(req);
+    await feed(fs, req);
+    expect(fs.replies()[0]).toMatchObject({ id: "c", ok: false, error: { code: "UNAUTHENTICATED" } });
+  });
+
+  test("replaying the exact same signed request → second is rejected", async () => {
+    const fs = fakeSocket(); handlers.open(fs.socket);
+    const req = signed("d", "world");
+    await feed(fs, req);
+    await feed(fs, req); // byte-for-byte replay
+    expect(fs.replies()[0]).toMatchObject({ id: "d", ok: true });
+    expect(fs.replies()[1]).toMatchObject({ id: "d", ok: false, error: { code: "UNAUTHENTICATED" } });
+  });
+
+  test("canonicalRequest is key-order independent (so equal requests sign equal)", () => {
+    const a: RequestEnvelope = { id: "1", method: "m", params: { x: 1, y: 2 } };
+    const b: RequestEnvelope = { id: "1", method: "m", params: { y: 2, x: 1 } };
+    expect(canonicalRequest(a)).toBe(canonicalRequest(b));
+    expect(sign(a)).toBe(sign(b));
+  });
+});
+
 describe("call ↔ createDoorHandlers over a real unix socket", () => {
   let sockPath = "";
   let server: { stop: () => void } | undefined;
@@ -176,5 +233,23 @@ describe("call ↔ createDoorHandlers over a real TCP socket (host:port)", () =>
 
     await expect(call(ep, "echo", { value: 11 }, { auth: "nope" })).rejects.toThrow();
     await expect(call(ep, "echo", { value: 11 })).rejects.toThrow(); // no token at all
+  });
+
+  test("an HMAC-signed tcp door: signed calls round-trip; an unsigned one is rejected", async () => {
+    const KEY = "launch-hmac-key";
+    server = Bun.listen({
+      hostname: "127.0.0.1",
+      port: 0,
+      socket: createDoorHandlers("test", { echo: (p) => ({ echoed: p.value }) }, noop, hmacAuthorizer(KEY)),
+    }) as unknown as { stop: () => void; port: number };
+    const ep = `127.0.0.1:${server.port}`;
+    const sign = hmacSigner(KEY);
+
+    // each call has a fresh id, so two signed calls both succeed (not replays)
+    expect(await call<{ echoed: unknown }>(ep, "echo", { value: 1 }, { sign })).toEqual({ echoed: 1 });
+    expect(await call<{ echoed: unknown }>(ep, "echo", { value: 2 }, { sign })).toEqual({ echoed: 2 });
+
+    await expect(call(ep, "echo", { value: 3 })).rejects.toThrow();                    // unsigned
+    await expect(call(ep, "echo", { value: 3 }, { sign: hmacSigner("nope") })).rejects.toThrow(); // wrong key
   });
 });

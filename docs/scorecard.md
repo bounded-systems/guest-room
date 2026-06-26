@@ -25,7 +25,7 @@ explicit that the ENFORCEMENT side reduces to the broker and substrate.**
 |---|---|---|---|---|
 | **Saltzer & Schroeder (1975)** | A− | economy of mechanism (tiny pure TCB); fail-safe defaults (`deniedDoors`, `checkCaveats` ▣); least privilege (rulebook); psychological acceptability (legible rulebook) | complete mediation (broker must route every effect) | **separation of privilege** ~absent in v0 (the two-key "hotel-safe" is deferred). "Nearly 1:1" was an overclaim. |
 | **Reference monitor (Anderson 1972)** | B | "small enough to verify" — strongly (pure fns + ▣ proofs) | "always invoked" and "tamper-proof" reduce to broker/substrate | only **1 of 3** properties is provable in-repo. The engine is the decision logic, not the chokepoint. |
-| **Object-capability (Miller)** | A | no ambient authority ("names no guest"); append-only `attenuate`/`attenuatesDoors` ▣; introduction-by-message (`resolveProvider`); revocation via lease (`isConfined` ▣) | unforgeability of the reference itself | the unforgeable token **is the OS socket** — strong on `unix`, **degrades on `tcp`**, now re-armed by the wire token (`tokenAuthorizer`, `protocol.ts`); HMAC-per-request would close replay. |
+| **Object-capability (Miller)** | A | no ambient authority ("names no guest"); append-only `attenuate`/`attenuatesDoors` ▣; introduction-by-message (`resolveProvider`); revocation via lease (`isConfined` ▣) | unforgeability of the reference itself | the unforgeable token **is the OS socket** — strong on `unix`, **degrades on `tcp`**, now re-armed on the wire by `tokenAuthorizer` / `hmacAuthorizer` (`protocol.ts`) — the latter also defeats tamper + replay. |
 | **Macaroons (Google 2014)** | C+ | append-only first-party caveat semantics ▣; non-widening ▣ | — | **macaroon-*shaped*, not macaroon-*secured*** — no HMAC chaining, no third-party/discharge caveats. The registry substitutes for the crypto binding. |
 | **NIST Zero Trust (SP 800-207)** | B+ | no ambient trust; per-request `checkCaveats(ctx)` ▣; temporal lease ≈ continuous eval ▣ | the PEP (broker), device identity, telemetry-driven policy | enforcement point + monitoring loop live below the room — half of ZTA, by design. |
 | **NIST SP 800-53** | B | the *mechanism* for AC-3, AC-6 (and AC-4 info-flow, AC-16 attributes) | assessment, audit (AU-*), org context | a **building block, not a compliance attestation** — nothing assessed. |
@@ -116,9 +116,10 @@ it with **Verus** (Tier 3, Rust-native), so the proof can't drift from the binar
 What none of these fix — and shouldn't be asked to — is the **macaroon C+** (needs
 *crypto*: HMAC/signing in `keeperd` / `ocap-provenance`, not a prover) and the
 **`tcp` ocap degradation**. Those are substrate and crypto gaps, orthogonal to any
-validation engine. The second now has its wire mechanism: `protocol.ts` carries a
-fail-closed `RequestAuthorizer` with a constant-time `tokenAuthorizer`, so a
-tcp/vsock door can require the per-launch token a unix socket's kernel credentials
-gave for free — the bearer form ships; an HMAC-per-request authorizer (defeating
-replay) is a drop-in at the same seam. The macaroon binding remains the open crypto
-work, and it shares that HMAC machinery.
+validation engine. The second is now **closed on the wire**: `protocol.ts` carries
+a fail-closed `RequestAuthorizer` with both a constant-time `tokenAuthorizer`
+(bearer) and an `hmacAuthorizer` (per-request HMAC-SHA256 over the canonicalized
+request, with bounded-FIFO replay rejection by request id) — so a tcp/vsock door
+recovers authenticity, integrity, and anti-replay, the authority a unix socket's
+kernel credentials gave for free. The macaroon binding remains the open crypto
+work — and it reuses this same HMAC machinery (chain the tag across caveats).
