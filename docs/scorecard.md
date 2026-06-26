@@ -76,13 +76,16 @@ encode the invariant as SMT constraints, ask Z3 for a counterexample, get `unsat
 = proven. Note there is **no mature prover for TS *source* itself** (the type
 system isn't a proof assistant); you model the algebra, you don't verify the `.ts`.
 
-**Tier 2 — the temporal properties want a model checker.** Confinement is
-really a *temporal* claim ("a capability dies with its lease, across all
-interleavings of register/lease/introduce/teardown"). That is exactly **TLA+**'s
-home turf — model it in TLA+ and check with TLC, or **Apalache** (a modern,
-symbolic, SMT-backed TLA+ checker). This is the highest-leverage single step for
-the Zero-Trust / confinement rows, because enumeration in TS can't cover arbitrary
-event orderings the way a model checker does.
+**Tier 2 — the temporal properties want a model checker (done for confinement).**
+Confinement is really a *temporal* claim ("a capability dies with its lease, across
+all interleavings of register/lease/introduce/teardown"), which enumeration in TS
+can't cover. That is **TLA+**'s home turf, and it's now modelled in
+[`specs/Confinement.tla`](../specs/Confinement.tla): TLC checks `ConfinedIsBacked`
+and `ExpiredNotConfined` against an adversary that forges wider doors and replays
+across the lease boundary — **green over 5104 states, depth 13**, with a non-vacuity
+witness. Next escalations on this tier: scale the constants, add **Apalache**
+(symbolic, SMT-backed TLA+) for larger domains, and model the broker's
+register/teardown to attack the "always invoked" gap.
 
 **Tier 3 — a proof assistant, if you want unbounded machine-checked theorems.**
 Most modern / actively-developed: **Lean 4** (large momentum, great tooling).
