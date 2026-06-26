@@ -68,6 +68,57 @@ guest-room is the runtime [`claude-box`](https://github.com/bounded-systems/clau
 turned out to be built on: nothing in here knows or cares who the guest is.
 `claude-box` is one consumer — Claude Code — plugged into it.
 
+## Transports — same authority, different wire
+
+A door is a capability addressed over a **transport**, and the capability model is
+transport-agnostic (`mod.ts`, *Door transport*): the **substrate** picks the wire,
+the room never does. The same `keeper` door — same grant, same env var, same
+in-room socket — is reached over:
+
+- **unix** — a filesystem socket on the same machine (the default: container or native).
+- **vsock** — a `(CID, port)` pair that crosses the VM boundary, for microVM
+  substrates like [apple/container](https://github.com/apple/container), where a
+  unix socket can't be shared host↔guest.
+- **tcp** — a `host:port` across the network, for remote/distributed brokers.
+
+`features/transport.feature` executes this: resolve a door over each wire and the
+authority is the *same object* — only the broker address (`transportString`) moves.
+
+**But the wires are not equally trustworthy, and that trust is a substrate
+property, not an engine one.** A unix socket is gated by filesystem permissions and
+lets the broker read the peer's kernel credentials (`SO_PEERCRED` on Linux,
+`LOCAL_PEERCRED` / `getpeereid` on macOS/BSD) — the kernel vouches, unforgeably, for
+*who* knocked. A vsock identifies the peer VM by CID. A tcp port carries no peer
+identity at all: anyone who can route to it can knock. So moving a door to tcp
+*loses* the authentication the kernel gave you for free, and the broker must
+replace it on the wire (a per-launch token in the request envelope). The engine
+carries the transport; the broker enforces the trust — the full reduction is in
+[`docs/authority-and-attenuation.md`](docs/authority-and-attenuation.md).
+
+## Where this maps — the security canon this *is*
+
+guest-room doesn't invent a model; it's a mechanical instance of long-standing
+ones. It is **not** OPA/Rego — Rego is a policy *language*; guest-room is the
+reference monitor *around* a policy (the broker's caveat verifiers are the rules,
+`checkCaveats` is the fail-closed combinator that calls them).
+
+| Canon | What it says | Where guest-room is it |
+|---|---|---|
+| **Saltzer & Schroeder** (1975) | least privilege · fail-safe defaults · complete mediation · economy of mechanism | the rulebook (least authority) · `deniedDoors` (deny by default) · `checkCaveats` (fail-closed mediation) · small pure TCB |
+| **Reference monitor** (Anderson 1972) | tamper-proof · always-invoked · small enough to verify | the broker at the socket boundary + `checkCaveats`; the engine is pure functions on purpose |
+| **Object-capability model** (Miller) | authority is an unforgeable reference, not an actor property; narrow by attenuation | the whole `door` model; `attenuate` is Miller's rule |
+| **Macaroons** (Google 2014) | append-only caveats narrow a credential | `attenuate` / `attenuatesDoors` are macaroon-shaped |
+| **NIST Zero Trust** (SP 800-207) | no ambient trust · per-request authorization · PDP/PEP split | nothing is ambient · per-request `checkCaveats` · broker = PEP, verifiers = PDP |
+| **NIST SP 800-53** | AC-3 access enforcement · AC-6 least privilege | door resolution + the rulebook |
+| **OWASP Top 10 A01:2021** | Broken Access Control — enforce deny-by-default, server-side | the door boundary is that server-side control |
+| **OWASP LLM Top 10 — LLM06:2025** | Excessive Agency — bound an agent's functionality/permissions; *don't let the model decide its own authorization* | the core thesis: authority is absent unless granted, decided outside the agent |
+
+The sharpest match is **LLM06 (Excessive Agency)**: OWASP's own mitigation —
+*"do not rely on the LLM to decide whether an action is authorized; all downstream
+systems must independently enforce authorization"* — is verbatim what the door
+boundary does. Peer credentials are where that enforcement bottoms out: the
+kernel, not the payload, decides who is on the other end of a unix-socket door.
+
 ## Usage
 
 The engine is parameterized over a **catalog** (the doors a kind of room can
@@ -118,6 +169,8 @@ docs cannot drift from the code.
 | Attenuation is append-only — authority never widens | `features/attenuation.feature` → `attenuate` / `attenuatesDoors` | `5a44110` |
 | A capability dies with its lease and never exceeds its ceiling | `features/confinement.feature` → `isConfined` / `resolveProvider` | `5a44110` |
 | The engine names no guest, so it works for any agent | `guest-room.test.ts` ("names no guest") | `5a44110` |
+| A door's authority is the same object across unix/vsock/tcp wires | `features/transport.feature` → `unix`/`vsock`/`tcp` / `transportString` / `resolveDoor` in `mod.ts` | `877a11b` |
+| The algebra holds for EVERY case, not just examples (attenuation ≡ superset; enforcement is fail-closed and monotone; confinement is ceiling-bound + lease-gated) | `algebra-proofs.test.ts` (bounded model checking by exhaustion) | `412b3f2` |
 
 ```sh
 bun test
@@ -151,6 +204,10 @@ guest-room/
 - [`docs/authority-and-attenuation.md`](docs/authority-and-attenuation.md) — what
   guest-room proves about authority, what it defers to the substrate, and where a
   provenance layer fits above it.
+- [`docs/scorecard.md`](docs/scorecard.md) — an honest self-rating against the
+  canon above (per spec: proven in-engine vs. deferred vs. the real gap), the
+  algebra theorems now proven by exhaustion (`algebra-proofs.test.ts`), and the
+  verification roadmap (what to reach for next, in TS or Rust).
 
 In the object-capability tradition (POLA), with macaroon-style append-only caveat
 attenuation and lease-bound confinement.

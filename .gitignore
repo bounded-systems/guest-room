@@ -1,3 +1,9 @@
 node_modules/
 *.log
 .DS_Store
+
+# TLA+ model checker — downloaded on demand, not vendored (see specs/README.md)
+specs/tla2tools.jar
+specs/*.toolbox/
+specs/states/
+specs/*.out

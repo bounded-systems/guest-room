@@ -135,9 +135,40 @@ this engine. The trusted base is small and explicit:
   its declared ceiling is bounded* — the broker's. This is the root `isConfined`
   trusts; a too-wide ceiling here voids confinement downstream.
 - **workcell isolation** (the fd really dies at teardown) — the substrate's
+- **transport peer-authentication** — *who is on the other end of a door* — the
+  substrate's, and it is **not uniform across wires** (see below)
 - **caveat enforcement** — the broker's verifiers, combined fail-closed by the
   engine (next section)
 - **the attenuation algebra** — *this engine's*, and the part proven here
+
+#### Transport trust is not uniform — and the engine is blind to it by design
+
+A door is addressed over a transport (`mod.ts`, *Door transport*: `unix` / `vsock`
+/ `tcp`), and the engine treats them identically — `resolveDoor` resolves the same
+capability whichever wire carries it, and `features/transport.feature` pins that
+the authority is the *same object* across wires. That uniformity is a feature of
+the *algebra* and a hazard of the *substrate*, because the wires do not
+authenticate their peer equally:
+
+- **unix** — gated by filesystem permissions, and the broker can read the peer's
+  kernel credentials (`SO_PEERCRED` on Linux; `LOCAL_PEERCRED` / `getpeereid` on
+  macOS/BSD). The **kernel** vouches for the peer's uid/gid, unforgeably — the
+  strongest peer-authentication available, and the reason unix is the default.
+- **vsock** — identifies the peer *VM* by CID across the host↔guest boundary;
+  coarser than a uid, but still substrate-attested.
+- **tcp** — carries **no** peer identity. Anyone who can route to the port can
+  knock. The kernel-vouched authentication a unix socket gave for free is gone.
+
+So a door that moves from a unix socket to a tcp port (e.g. to cross a microVM
+boundary on a substrate that can't share a unix socket host↔guest) silently loses
+its peer-authentication unless the broker **replaces it on the wire** — a
+per-launch bearer token in the request envelope, or per-peer interface binding.
+This is a genuine TCB line, and it is the substrate's / broker's, not the engine's:
+the engine deliberately carries the transport without interpreting its trust, the
+same separation that keeps it guest-agnostic. The honest rule: *the rulebook's
+"GRANTED" is only as sound as the wire's proof of who is knocking* — and that proof
+is `unix > vsock > tcp`, with tcp requiring the broker to reconstruct, in the
+payload, the identity the kernel would otherwise have supplied.
 
 These pass the membership test the intent-blindness principle implies: a
 legitimate TCB element is auditable mechanism (a deterministic verifier, an

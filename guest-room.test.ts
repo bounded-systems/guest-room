@@ -25,6 +25,8 @@ import {
   grantedDoorLines,
   deniedDoorSection,
   transportString,
+  tcp,
+  vsock,
   resolveProvider,
   isConfined,
   type ProviderEntry,
@@ -74,6 +76,20 @@ const steps = new StepRegistry()
   })
   .step(/^its in-room socket is "([^"]*)"$/, (w, sock) => {
     expect(transportString((w.grant as DoorGrant).guest)).toBe(sock);
+  })
+
+  // resolve a door whose broker is reached over a non-default transport — the
+  // substrate (microVM/remote) moved the boundary, but the capability is the same
+  .step(/^the room resolves the "([^"]*)" door with the broker over tcp "([^"]*)"$/, (w, name, target) => {
+    const m = target.match(/^(.*):(\d+)$/)!;
+    w.grant = resolveDoor(w.catalog as DoorCatalog, name, tcp(m[1]!, Number(m[2])), env);
+  })
+  .step(/^the room resolves the "([^"]*)" door with the broker over vsock "([^"]*)"$/, (w, name, target) => {
+    const m = target.match(/^(\d+):(\d+)$/)!;
+    w.grant = resolveDoor(w.catalog as DoorCatalog, name, vsock(Number(m[1]), Number(m[2])), env);
+  })
+  .step(/^its broker is reached at "([^"]*)"$/, (w, addr) => {
+    expect(transportString((w.grant as DoorGrant).host)).toBe(addr);
   })
   .step(/^the room reaches it via the "([^"]*)" env var$/, (w, envVar) => {
     expect((w.grant as DoorGrant).env).toBe(envVar);
