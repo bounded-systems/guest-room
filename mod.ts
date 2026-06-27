@@ -316,6 +316,43 @@ export function verifyGrant(
   return { ok: true };
 }
 
+// ── Issuer keys (keyless, published-key verification) ────────────────────────
+// A signed grant names its issuer key by `kid` (binding.keyId). Rather than
+// pre-share a secret, a verifier holds the issuer's PUBLISHED public keys — a
+// set the issuer can rotate (publish a new key, retire an old one). The verifier
+// selects the key the grant names and validates against it: no shared secret,
+// identity-by-published-key. This is the keyless model the project's release
+// tooling already uses, adapted to a door system — the key set travels over a
+// door, not an HTTPS discovery endpoint. The engine models only the set +
+// selection; the crypto stays injected.
+
+/** One published issuer public key, selected by `kid`. */
+export type IssuerKey = { kid: string; publicKeyPem: string };
+
+/** An issuer's published key set. Multiple entries support rotation/overlap. */
+export type IssuerKeys = { keys: IssuerKey[] };
+
+/** Select the public key a grant names (`binding.keyId`); null if unknown. */
+export function resolveIssuerKey(keys: IssuerKeys, kid: string): IssuerKey | null {
+  return keys.keys.find((k) => k.kid === kid) ?? null;
+}
+
+/** Verify a signed grant against an issuer's PUBLISHED key set (no shared
+ *  secret): resolve `binding.keyId` in `keys`, then apply the same checks as
+ *  `verifyGrant`. `verifyWith` is injected — (data, signature, publicKeyPem) →
+ *  bool. An unknown `kid` fails closed (`unknown-key`). */
+export function verifyGrantWithKeys(
+  grant: SignedGrant,
+  ctx: { audience: string; now: number },
+  keys: IssuerKeys,
+  verifyWith: (data: string, signature: string, publicKeyPem: string) => boolean,
+): GrantVerdict {
+  if (!grant.signature || !grant.binding) return { ok: false, reason: "unsigned" };
+  const key = resolveIssuerKey(keys, grant.binding.keyId);
+  if (!key) return { ok: false, reason: "unknown-key" };
+  return verifyGrant(grant, ctx, (d, s) => verifyWith(d, s, key.publicKeyPem));
+}
+
 // ── Room attenuation ─────────────────────────────────────────────────────────
 // attenuate() narrows ONE door handed onward; this is the same rule lifted to
 // the SET of doors a parent hands to a sub-room. A child set attenuates from its
