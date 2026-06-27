@@ -241,6 +241,81 @@ export function checkCaveats<Ctx>(
   return { ok: true };
 }
 
+// ── Signed grants (authority in transit) ─────────────────────────────────────
+// On a unix transport the held reference IS the authority (you can't reach a
+// socket you weren't handed). Across a vsock/tcp boundary you can't pass an fd,
+// so reachability stops being authority and the authority must travel IN the
+// grant: a signature the SERVING room verifies before honoring a call. See the
+// consuming product's ADR-CAPABILITY-TRANSPORT and CONCIERGE.md §7.
+//
+// The engine stays key-agnostic: signing/verification are INJECTED functions
+// (the issuer's signer lives outside the engine, in a dedicated signing door).
+// The engine owns
+// only the CANONICAL BYTES and the binding checks, so issuer and verifier agree
+// on exactly what a signature covers. A signed grant is a bearer token, so it is
+// bound to an `audience` (which room may present it), an `exp`, and a `nonce`.
+
+/** The binding a signature covers alongside the grant's authority: who may
+ *  present it, until when, a freshness nonce, and the issuer key id (the
+ *  verifier selects the matching public key). */
+export type GrantBinding = {
+  audience: string; // room id permitted to present this grant
+  exp: number; // expiry, epoch ms
+  nonce: string; // single-use freshness token
+  keyId: string; // issuer key identity
+};
+
+/** A DoorGrant plus the issuer binding + signature that make it authority in
+ *  transit. `host` (broker-side) is deliberately NOT signed — only the granted
+ *  reference and its constraints are. */
+export type SignedGrant = DoorGrant & { binding: GrantBinding; signature: string };
+
+export type GrantVerdict = { ok: true } | { ok: false; reason: string };
+
+/** The canonical bytes a grant signature covers: the AUTHORITY-bearing fields
+ *  (name, the guest reference being granted, sorted caveats) plus the full
+ *  binding. Cosmetic fields (grants/use/env) and the broker-side `host` are
+ *  excluded, so re-describing or re-homing a door cannot change what was signed.
+ *  Issuer and verifier MUST compute these identically — hence one shared fn. */
+export function grantSigningBytes(grant: DoorGrant, binding: GrantBinding): string {
+  return JSON.stringify({
+    name: grant.name,
+    guest: grant.guest,
+    caveats: [...(grant.caveats ?? [])].sort(),
+    binding,
+  });
+}
+
+/** Attach an issuer binding + signature to a grant. `sign` is injected — the
+ *  engine never holds a key. */
+export function signGrant(
+  grant: DoorGrant,
+  binding: GrantBinding,
+  sign: (data: string) => string,
+): SignedGrant {
+  return { ...grant, binding, signature: sign(grantSigningBytes(grant, binding)) };
+}
+
+/** Verify a signed grant at the SERVING room before honoring a call. Order:
+ *  signature (over the canonical bytes) → audience match → expiry. `verify` is
+ *  injected (the verifier holds the issuer pubkey for `grant.binding.keyId`).
+ *  Single-use of the nonce needs cross-call state, so it is the caller's job;
+ *  `verifyGrant` reports the binding it accepted so the caller can record it.
+ *  Pair with `checkCaveats` for full enforcement (signature THEN caveats). */
+export function verifyGrant(
+  grant: SignedGrant,
+  ctx: { audience: string; now: number },
+  verify: (data: string, signature: string) => boolean,
+): GrantVerdict {
+  if (!grant.signature || !grant.binding) return { ok: false, reason: "unsigned" };
+  if (!verify(grantSigningBytes(grant, grant.binding), grant.signature)) {
+    return { ok: false, reason: "bad-signature" };
+  }
+  if (grant.binding.audience !== ctx.audience) return { ok: false, reason: "audience-mismatch" };
+  if (ctx.now > grant.binding.exp) return { ok: false, reason: "expired" };
+  return { ok: true };
+}
+
 // ── Room attenuation ─────────────────────────────────────────────────────────
 // attenuate() narrows ONE door handed onward; this is the same rule lifted to
 // the SET of doors a parent hands to a sub-room. A child set attenuates from its
