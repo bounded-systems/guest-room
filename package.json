@@ -13,6 +13,7 @@
   "exports": {
     ".": "./mod.ts",
     "./protocol": "./protocol.ts",
+    "./interpose": "./interpose.ts",
     "./daemon": "./daemon.ts",
     "./gherkin": "./gherkin.ts"
   },

@@ -4,6 +4,7 @@
   "exports": {
     ".": "./mod.ts",
     "./protocol": "./protocol.ts",
+    "./interpose": "./interpose.ts",
     "./daemon": "./daemon.ts",
     "./gherkin": "./gherkin.ts"
   },
@@ -11,6 +12,7 @@
     "include": [
       "mod.ts",
       "protocol.ts",
+      "interpose.ts",
       "daemon.ts",
       "gherkin.ts",
       "README.md",
