@@ -2,11 +2,21 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { unlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 
-import { type CaveatVerifiers, type DoorGrant, unix } from "./mod.ts";
+import { type CaveatVerifiers, type DoorGrant, type SignedGrant, tcp, transportToEndpoint, unix, vsock } from "./mod.ts";
 import { call, createDoorHandlers } from "./protocol.ts";
 import { type InterposeContext, createInterposerHandlers, enforceAndForward } from "./interpose.ts";
 
 const noop = (): void => {};
+
+/** A signed grant the bridge would present to a remote upstream (shape only —
+ *  the forwarding tests assert it's passed through, not its signature). */
+function signedGrant(caveats: string[]): SignedGrant {
+  return {
+    ...grant(caveats),
+    binding: { audience: "room-A", exp: Date.now() + 60_000, nonce: "n", keyId: "k" },
+    signature: "sig",
+  };
+}
 
 /** A minimal grant carrying the given caveats. */
 function grant(caveats: string[]): DoorGrant {
@@ -75,6 +85,44 @@ describe("enforceAndForward — the enforcement core (no sockets)", () => {
     expect(res.error?.code).toBe("CAVEAT_DENIED");
   });
 
+  test("an allowed request presents the upstreamGrant to the upstream (the bridge carries it)", async () => {
+    let received: SignedGrant | undefined;
+    const sg = signedGrant(["method=read"]);
+    await enforceAndForward(
+      { id: "g1", method: "read", params: {} },
+      {
+        upstream: "host.internal:3002", // a remote (tcp) upstream
+        grant: grant(["method=read"]),
+        verifiers: methodVerifiers,
+        upstreamGrant: sg,
+        forward: async (_ep, _m, _p, opts) => {
+          received = opts?.grant;
+          return {};
+        },
+      },
+    );
+    expect(received).toBe(sg); // the proxy, not the box, presents the grant on the wire
+  });
+
+  test("a caveat-denied request never presents the grant upstream (refused at the proxy)", async () => {
+    let forwarded = false;
+    const res = await enforceAndForward(
+      { id: "g2", method: "write", params: {} },
+      {
+        upstream: "host.internal:3002",
+        grant: grant(["method=read"]),
+        verifiers: methodVerifiers,
+        upstreamGrant: signedGrant(["method=read"]),
+        forward: async () => {
+          forwarded = true;
+          return {};
+        },
+      },
+    );
+    expect(forwarded).toBe(false);
+    expect(res.error?.code).toBe("CAVEAT_DENIED");
+  });
+
   test("an upstream failure surfaces as UPSTREAM_ERROR (not a caveat denial)", async () => {
     const res = await enforceAndForward(
       { id: "4", method: "read", params: {} },
@@ -89,6 +137,14 @@ describe("enforceAndForward — the enforcement core (no sockets)", () => {
     );
     expect(res.ok).toBe(false);
     expect(res.error?.code).toBe("UPSTREAM_ERROR");
+  });
+});
+
+describe("transportToEndpoint — the call()-shaped endpoint for a transport", () => {
+  test("unix → path, tcp → host:port, vsock → unsupported", () => {
+    expect(transportToEndpoint(unix("/run/x.sock"))).toBe("/run/x.sock");
+    expect(transportToEndpoint(tcp("host.internal", 3002))).toBe("host.internal:3002");
+    expect(() => transportToEndpoint(vsock(3, 5000))).toThrow(/vsock/);
   });
 });
 
