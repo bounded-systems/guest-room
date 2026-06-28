@@ -1,0 +1,29 @@
+package.json
+  s_8bfe0e8de6557c::t_498dbc374e4162 16
+interpose.test.ts
+  s_8bfe0e8de6557c::t_74e4aede0d1833 1-181
+interpose.ts
+  s_8bfe0e8de6557c::t_977a1932d0e14b 1-153
+docs/interposition.md
+  s_8bfe0e8de6557c::t_660c78d646be6b 58
+  s_8bfe0e8de6557c::t_d7c2572f334818 1-57,59-83
+jsr.json
+  s_8bfe0e8de6557c::t_498dbc374e4162 7
+  s_8bfe0e8de6557c::t_97e711750e2a1e 15
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "49bd4cfa1d2a39a84ba0e99dc2c5b6143c6d8424",
+  "prompts": {},
+  "sessions": {
+    "s_8bfe0e8de6557c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "159cecef-b114-4932-b219-6b198cbf9abd",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Robert DeLanghe <1240090+bdelanghe@users.noreply.github.com>"
+    }
+  }
+}
