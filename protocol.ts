@@ -13,6 +13,7 @@
 
 import { Buffer } from "node:buffer";
 import { createHmac } from "node:crypto";
+import { verifyGrantWithKeys, type SignedGrant, type IssuerKeys } from "./mod.ts";
 
 // This module's server half is transport-neutral; its client half (`call`)
 // targets Bun's socket API. Rather than depend on `@types/bun` (a bare "bun"
@@ -64,6 +65,11 @@ export type RequestEnvelope = {
    *  knock" survives the move off the filesystem. A bearer token today; an
    *  HMAC-over-the-request later, same field. */
   auth?: string;
+  /** Optional SIGNED grant the caller presents to a tcp/vsock serving room (see
+   *  {@link signedGrantAuthorizer}): on those transports a reachable socket is
+   *  not authority, so authority rides in this signed, audience/exp/nonce-bound
+   *  grant. Unused on a unix door (the held reference IS the authority). */
+  grant?: SignedGrant;
 };
 
 /** Response envelope: result (if ok=true) or error object (if ok=false). */
@@ -162,6 +168,30 @@ export function hmacAuthorizer(key: string, opts: { replayCap?: number } = {}): 
     order.push(req.id);
     if (order.length > cap) seen.delete(order.shift()!);
     return true;
+  };
+}
+
+/** A SIGNED-GRANT {@link RequestAuthorizer}: accept a request iff it carries a
+ *  `grant` that verifies against the issuer's PUBLISHED keys (verifyGrantWithKeys)
+ *  for THIS serving room. The transport-split answer for tcp/vsock doors — where
+ *  the kernel gives no peer identity — authority rides in the grant, not the
+ *  socket. Keyless: the room holds the issuer's published key set (fetched from
+ *  the concierge), no shared secret. `verifyWith` does the crypto (injected);
+ *  `now` defaults to wall-clock. When `door` is set, the grant's `name` must
+ *  match it, so a grant minted for one door can't be presented at another. */
+export function signedGrantAuthorizer(opts: {
+  keys: IssuerKeys;
+  audience: string;
+  verifyWith: (data: string, signature: string, publicKeyPem: string) => boolean;
+  now?: () => number;
+  door?: string;
+}): RequestAuthorizer {
+  const clock = opts.now ?? (() => Date.now());
+  return (req) => {
+    const grant = req.grant;
+    if (!grant) return false;
+    if (opts.door !== undefined && grant.name !== opts.door) return false;
+    return verifyGrantWithKeys(grant, { audience: opts.audience, now: clock() }, opts.keys, opts.verifyWith).ok;
   };
 }
 
