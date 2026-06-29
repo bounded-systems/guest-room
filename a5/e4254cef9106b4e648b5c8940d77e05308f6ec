@@ -1,0 +1,23 @@
+jsr.json
+  s_c4318117f42b02::t_dc2731eb9f46c9 3
+package.json
+  s_c4318117f42b02::t_a31bb263004e64 3
+.release/grant-in-call.md
+  s_c4318117f42b02::t_81cab976cab6ae 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "a5e4254cef9106b4e648b5c8940d77e05308f6ec",
+  "prompts": {},
+  "sessions": {
+    "s_c4318117f42b02": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b707ec58-424b-452d-b628-e6eb4bd39018",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Robert DeLanghe <1240090+bdelanghe@users.noreply.github.com>"
+    }
+  }
+}
