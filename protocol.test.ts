@@ -8,7 +8,7 @@ import { describe, test, expect, afterEach } from "bun:test";
 import { tmpdir } from "node:os";
 import { unlinkSync } from "node:fs";
 import {
-  ok, err, createDoorHandlers, call,
+  ok, err, createDoorHandlers, call, DoorCallError,
   constantTimeEqual, tokenAuthorizer,
   hmacSigner, hmacAuthorizer, canonicalRequest,
   type ResponseEnvelope, type RequestEnvelope,
@@ -199,6 +199,57 @@ describe("call ↔ createDoorHandlers over a real unix socket", () => {
     expect(res).toEqual({ echoed: 7 });
 
     await expect(call(sockPath, "fail")).rejects.toThrow("boom");
+  });
+
+  test("a daemon error's code survives as DoorCallError.code (per-door clients pattern-match on it)", async () => {
+    sockPath = `${tmpdir()}/gr-proto-${crypto.randomUUID()}.sock`;
+    server = Bun.listen({
+      unix: sockPath,
+      socket: createDoorHandlers("test", {
+        fail: () => { throw new Error("boom"); },
+      }, noop),
+    });
+
+    try {
+      await call(sockPath, "fail");
+      throw new Error("expected call() to reject");
+    } catch (e) {
+      expect(e).toBeInstanceOf(DoorCallError);
+      expect((e as DoorCallError).code).toBe("HANDLER_ERROR");
+      expect((e as DoorCallError).message).toBe("boom");
+    }
+  });
+
+  test("a server that closes without answering rejects CONNECTION_CLOSED instead of hanging", async () => {
+    sockPath = `${tmpdir()}/gr-proto-${crypto.randomUUID()}.sock`;
+    server = Bun.listen({
+      unix: sockPath,
+      socket: {
+        open(socket: { end(): void }) { socket.end(); }, // hang up, no response line
+        data() {},
+        close() {},
+        error() {},
+      },
+    });
+
+    try {
+      await call(sockPath, "echo", { value: 1 });
+      throw new Error("expected call() to reject");
+    } catch (e) {
+      expect(e).toBeInstanceOf(DoorCallError);
+      expect((e as DoorCallError).code).toBe("CONNECTION_CLOSED");
+    }
+  });
+
+  test("connecting to a socket with nothing listening rejects CONNECTION_ERROR", async () => {
+    const deadSock = `${tmpdir()}/gr-proto-dead-${crypto.randomUUID()}.sock`;
+    try {
+      await call(deadSock, "echo", { value: 1 });
+      throw new Error("expected call() to reject");
+    } catch (e) {
+      expect(e).toBeInstanceOf(DoorCallError);
+      expect((e as DoorCallError).code).toBe("CONNECTION_ERROR");
+    }
   });
 });
 
