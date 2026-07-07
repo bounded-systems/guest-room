@@ -1,0 +1,29 @@
+START-HERE.md
+  s_e3fff2f6060e6c::t_421f802fad7c53 10-12,14-16,18-20
+docs/scorecard.md
+  s_e3fff2f6060e6c::t_8facbe2af71115 14-16,18-21
+  s_e3fff2f6060e6c::t_9110a31b70c64a 25-27
+  s_e3fff2f6060e6c::t_485f503076c0c3 33-34
+README.md
+  s_e3fff2f6060e6c::t_021df38d9a654a 182-183
+  s_e3fff2f6060e6c::t_787191d0782678 57-58
+  s_e3fff2f6060e6c::t_95edfe9dbb1882 189-190
+  s_e3fff2f6060e6c::t_af9400ff42fe8b 204-210
+  s_e3fff2f6060e6c::t_1670fce95d984f 70-73
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "301ebc468fccdbf4435d0dfcbe9aab06e2f83a4b",
+  "prompts": {},
+  "sessions": {
+    "s_e3fff2f6060e6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4b45e8d3-21a6-47bd-bcd5-77e2c160db83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Robert DeLanghe <1240090+bdelanghe@users.noreply.github.com>"
+    }
+  }
+}
