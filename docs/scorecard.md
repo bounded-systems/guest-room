@@ -11,20 +11,27 @@ are small pure functions written to be checkable — and as of `algebra-proofs.t
 **checked by exhaustion, not just by example**. Every *downgrade* is one of the same
 three deferred things, each a named TCB line (`docs/authority-and-attenuation.md`):
 
-1. **"always invoked"** — non-bypassability is the broker's job, not the engine's.
+1. **"always invoked"** — the enforcement chokepoint now lives in-repo
+   (`interpose.ts`, proven to never forward a denial); its *unavoidability* on
+   every path is still the broker's / deployment's job.
 2. **peer-authentication / unforgeability** — the substrate's, and not uniform: `unix > vsock > tcp`.
-3. **cryptographic binding** — absent; the live registry stands in for it.
+3. **cryptographic binding** — present for *signed grants* (`signedGrantAuthorizer`
+   verifies an Ed25519 signature against the issuer's published key,
+   `verifyGrantWithKeys`); still absent for the *caveat chain itself* (the macaroon
+   C+ gap), where the live registry stands in.
 
 So the honest headline is not "we match these specs." It is: **guest-room is a
 faithful, now partly-*proven*, instance of the DECISION side of these specs, and is
-explicit that the ENFORCEMENT side reduces to the broker and substrate.**
+explicit that the ENFORCEMENT side largely reduces to the broker and substrate** —
+with the interposition chokepoint (`interpose.ts`) now the one piece of enforcement
+proven in-repo.
 
 ## The ratings
 
 | Spec | Grade | Proven in engine (`mod.ts`, tested/▣ proven) | Deferred / out of scope | Biggest gap |
 |---|---|---|---|---|
-| **Saltzer & Schroeder (1975)** | A− | economy of mechanism (tiny pure TCB); fail-safe defaults (`deniedDoors`, `checkCaveats` ▣); least privilege (rulebook); psychological acceptability (legible rulebook) | complete mediation (broker must route every effect) | **separation of privilege** ~absent in v0 (the two-key "hotel-safe" is deferred). "Nearly 1:1" was an overclaim. |
-| **Reference monitor (Anderson 1972)** | B | "small enough to verify" — strongly (pure fns + ▣ proofs) | "always invoked" and "tamper-proof" reduce to broker/substrate | only **1 of 3** properties is provable in-repo. The engine is the decision logic, not the chokepoint. |
+| **Saltzer & Schroeder (1975)** | A− | economy of mechanism (tiny pure TCB); fail-safe defaults (`deniedDoors`, `checkCaveats` ▣); least privilege (rulebook); psychological acceptability (legible rulebook); **complete-mediation mechanism now proven in-repo** (`interpose.ts` never forwards a denial) | complete mediation's *unavoidability* (the broker being on every path) is deployment | **separation of privilege** ~absent (the two-key "hotel-safe" is still deferred) — the one principle left materially down. "Nearly 1:1" was an overclaim. |
+| **Reference monitor (Anderson 1972)** | B+ | "small enough to verify" — strongly (pure fns + ▣ proofs); the **enforcement chokepoint now exists in-repo** — `interpose.ts` enforces before forwarding, and `interpose.test.ts` proves a denied request is NEVER forwarded, over real unix sockets and chained interposers (authority only shrinks down a chain) | that the chokepoint is *unavoidably* on every path ("always invoked" in the deployment sense) still reduces to the substrate; so does "tamper-proof" | **2 of 3** now provable in-repo: verifiability + a proven chokepoint. Only substrate-level non-bypass + tamper-proofness remain. |
 | **Object-capability (Miller)** | A | no ambient authority ("names no guest"); append-only `attenuate`/`attenuatesDoors` ▣; introduction-by-message (`resolveProvider`); revocation via lease (`isConfined` ▣) | unforgeability of the reference itself | the unforgeable token **is the OS socket** — strong on `unix`, **degrades on `tcp`**, now re-armed on the wire by `tokenAuthorizer` / `hmacAuthorizer` (`protocol.ts`) — the latter also defeats tamper + replay. |
 | **Macaroons (Google 2014)** | C+ | append-only first-party caveat semantics ▣; non-widening ▣ | — | **macaroon-*shaped*, not macaroon-*secured*** — no HMAC chaining, no third-party/discharge caveats. The registry substitutes for the crypto binding. |
 | **NIST Zero Trust (SP 800-207)** | B+ | no ambient trust; per-request `checkCaveats(ctx)` ▣; temporal lease ≈ continuous eval ▣ | the PEP (broker), device identity, telemetry-driven policy | enforcement point + monitoring loop live below the room — half of ZTA, by design. |

@@ -54,9 +54,8 @@ the box to reach for.
 - **rulebook** — the per-launch manifest the agent receives: exactly what is
   granted, and what is denied.
 
-The rulebook follows Searle's Chinese Room: the agent acts only through the cards
-(doors) it holds, and a symbol with no card has no rule. A missing door cannot be
-hallucinated into a success, because the rulebook names it as absent.
+A missing door cannot be hallucinated into a success, because the rulebook names
+it as absent.
 
 A door can be **attenuated** — narrowed by append-only caveats (a single host,
 read-only mode). Authority only ever decreases: a holder hands a door onward
@@ -67,6 +66,10 @@ engine guest-agnostic.
 guest-room is the runtime [`claude-box`](https://github.com/bounded-systems/claude-box)
 turned out to be built on: nothing in here knows or cares who the guest is.
 `claude-box` is one consumer — Claude Code — plugged into it.
+
+guest-room is one seam of [bounded-systems](https://github.com/bounded-systems) —
+the bet that every privileged effect an agent performs should be attributable to a
+signed owner, with contracts between components enforced rather than remembered.
 
 ## Transports — same authority, different wire
 
@@ -176,13 +179,15 @@ docs cannot drift from the code.
 | The algebra holds for EVERY case, not just examples (attenuation ≡ superset; enforcement is fail-closed and monotone; confinement is ceiling-bound + lease-gated) | `algebra-proofs.test.ts` (bounded model checking by exhaustion) | `412b3f2` |
 | A tcp/vsock door can require a per-launch token; unauthorized peers reach no handler (fail closed) | `protocol.test.ts` → `tokenAuthorizer` / `RequestAuthorizer` in `protocol.ts` | `f32b08e` |
 | A per-request HMAC door rejects tampered, wrong-key, and replayed requests | `protocol.test.ts` → `hmacSigner` / `hmacAuthorizer` / `canonicalRequest` in `protocol.ts` | `c487d4e` |
+| A denied request is NEVER forwarded upstream — proven over real unix sockets, including chained interposers where authority only shrinks | `interpose.test.ts` → `enforceAndForward` / `transportToEndpoint` in `interpose.ts` | `89e7b09` |
+| A signed grant is honored only if its Ed25519 signature verifies against the issuer's published key, for this room (audience) and this door | `signed-grant-authorizer.test.ts` / `issuer-keys.test.ts` → `signedGrantAuthorizer` (`protocol.ts`) / `verifyGrantWithKeys` (`mod.ts`) | `79662ab` |
 
 ```sh
 bun test
 ```
 
-The fixture catalog in the test is a deliberately non-Claude hotel — proof the
-engine works for any guest.
+The fixture catalog in the test is deliberately non-Claude — proof the engine
+works for any guest.
 
 ## What's here (v0 — tested core)
 
@@ -196,10 +201,13 @@ guest-room/
 └── docs/
 ```
 
-> **Deferred to a later release.** The wider runtime — a JSON-over-socket door
-> `protocol`, shared `daemon` scaffolding, a two-key `hotel-safe`, and a
-> `room-service` token issuer — lives in `claude-box` today and graduates here
-> once it lands with tests. v0 ships only the proven, seam-guarded core.
+> **The wider runtime — now mostly in-tree.** The JSON-over-socket door
+> `protocol`, shared `daemon` scaffolding, the `interpose` enforcement chokepoint,
+> and the signed-grant issuer (`signedGrantAuthorizer` / `verifyGrantWithKeys`)
+> graduated from `claude-box` and ship here with tests (`protocol.test.ts`,
+> `daemon.test.ts`, `interpose.test.ts`, `signed-grant-authorizer.test.ts`,
+> `issuer-keys.test.ts`). The one piece still deferred is the two-key escrow (the
+> `hotel-safe`); when it lands it graduates the same way, behind tests.
 
 ## Going deeper
 
