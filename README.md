@@ -1,11 +1,12 @@
+<!-- descriptor:header start -->
 # guest-room
 
-**guest-room scopes what an agent is allowed to do, and refuses everything else
-by construction — not by a reminder you hope it reads.**
+**guest-room scopes what an agent is allowed to do, and refuses everything else by construction — not by a reminder you hope it reads.**
 
-I built it for my own work. I wanted an agent that did the task and didn't get
-distracted or reach for things I never granted it. guest-room makes "exactly
-these capabilities, nothing ambient" a real, testable object.
+I built it for my own work. I wanted an agent that did the task and didn't get distracted or reach for things I never granted it. guest-room makes "exactly these capabilities, nothing ambient" a real, testable object.
+
+🟡 **Partial** — mechanism present; named gaps remain.
+<!-- descriptor:header end -->
 
 > New here? **[START-HERE.md](START-HERE.md)** is the two-minute version.
 
@@ -165,26 +166,28 @@ See [`examples/quickstart.ts`](examples/quickstart.ts) for a runnable version.
 
 ## Every claim here runs
 
-The specs in `features/*.feature` are executed against the engine (`mod.ts`) by
-`bun test`. Describe a behavior the engine lacks and the suite goes red, so the
-docs cannot drift from the code.
+<!-- descriptor:claims start -->
+Every row is generated from `descriptor.proof` in `trellis.json`: the `Proven by`
+file must exist, and `Pinned at` is its last-touching commit — so the table cannot
+cite a test that isn't there, and a pin cannot go stale.
 
 | Claim | Proven by | Pinned at |
 |---|---|---|
-| A room grants exactly its doors and denies the rest, by name | `features/rulebook.feature` → `deniedDoors` / `deniedDoorSection` in `mod.ts` | `5a44110` |
-| Attenuation is append-only — authority never widens | `features/attenuation.feature` → `attenuate` / `attenuatesDoors` | `5a44110` |
-| A capability dies with its lease and never exceeds its ceiling | `features/confinement.feature` → `isConfined` / `resolveProvider` | `5a44110` |
-| The engine names no guest, so it works for any agent | `guest-room.test.ts` ("names no guest") | `5a44110` |
-| A door's authority is the same object across unix/vsock/tcp wires | `features/transport.feature` → `unix`/`vsock`/`tcp` / `transportString` / `resolveDoor` in `mod.ts` | `877a11b` |
-| The algebra holds for EVERY case, not just examples (attenuation ≡ superset; enforcement is fail-closed and monotone; confinement is ceiling-bound + lease-gated) | `algebra-proofs.test.ts` (bounded model checking by exhaustion) | `412b3f2` |
-| A tcp/vsock door can require a per-launch token; unauthorized peers reach no handler (fail closed) | `protocol.test.ts` → `tokenAuthorizer` / `RequestAuthorizer` in `protocol.ts` | `f32b08e` |
-| A per-request HMAC door rejects tampered, wrong-key, and replayed requests | `protocol.test.ts` → `hmacSigner` / `hmacAuthorizer` / `canonicalRequest` in `protocol.ts` | `c487d4e` |
-| A denied request is NEVER forwarded upstream — proven over real unix sockets, including chained interposers where authority only shrinks | `interpose.test.ts` → `enforceAndForward` / `transportToEndpoint` in `interpose.ts` | `89e7b09` |
-| A signed grant is honored only if its Ed25519 signature verifies against the issuer's published key, for this room (audience) and this door | `signed-grant-authorizer.test.ts` / `issuer-keys.test.ts` → `signedGrantAuthorizer` (`protocol.ts`) / `verifyGrantWithKeys` (`mod.ts`) | `79662ab` |
+| A room grants exactly its doors and denies the rest, by name | `features/rulebook.feature` → `deniedDoors` / `deniedDoorSection` in `mod.ts` | `5b27d25` |
+| Attenuation is append-only — authority never widens | `features/attenuation.feature` → `attenuate` / `attenuatesDoors` | `5b27d25` |
+| A capability dies with its lease and never exceeds its ceiling | `features/confinement.feature` → `isConfined` / `resolveProvider` | `acab3c8` |
+| The engine names no guest, so it works for any agent | `guest-room.test.ts` ("names no guest") | `d232e01` |
+| A door's authority is the same object across unix/vsock/tcp wires | `features/transport.feature` → `transportString` / `resolveDoor` in `mod.ts` | `d232e01` |
+| The algebra holds for EVERY case, not just examples (bounded-exhaustive) | `algebra-proofs.test.ts` (bounded model checking by exhaustion) | `d232e01` |
+| A tcp/vsock door requires a per-launch token; unauthorized peers reach no handler | `protocol.test.ts` → `tokenAuthorizer` / `RequestAuthorizer` in `protocol.ts` | `e8cbeaa` |
+| A per-request HMAC door rejects tampered, wrong-key, and replayed requests | `protocol.test.ts` → `hmacSigner` / `hmacAuthorizer` / `canonicalRequest` | `e8cbeaa` |
+| A denied request is NEVER forwarded upstream — over real unix sockets and chains | `interpose.test.ts` → `enforceAndForward` / `transportToEndpoint` in `interpose.ts` | `66ee3c1` |
+| A signed grant is honored only if its Ed25519 signature verifies against the issuer key | `signed-grant-authorizer.test.ts` → `signedGrantAuthorizer` (`protocol.ts`) / `verifyGrantWithKeys` (`mod.ts`) | `79662ab` |
 
 ```sh
 bun test
 ```
+<!-- descriptor:claims end -->
 
 The fixture catalog in the test is deliberately non-Claude — proof the engine
 works for any guest.

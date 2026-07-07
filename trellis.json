@@ -1,0 +1,37 @@
+{
+  "node": "guest-room",
+  "visibility": "public",
+  "provides": [
+    { "type": "guest-room-protocol", "kind": "wire", "spec": { "verbspec": "./mod.ts" } },
+    { "type": "room-sdk", "kind": "schema" },
+    { "type": "door-sdk", "kind": "schema" }
+  ],
+  "consumes": [],
+  "descriptor": {
+    "tagline": "guest-room scopes what an agent is allowed to do, and refuses everything else by construction — not by a reminder you hope it reads.",
+    "what": "I built it for my own work. I wanted an agent that did the task and didn't get distracted or reach for things I never granted it. guest-room makes \"exactly these capabilities, nothing ambient\" a real, testable object.",
+    "role": { "hotel": "room-sdk + door-sdk", "kind": "library" },
+    "status": "Partial",
+    "proof": {
+      "suite": "bun test",
+      "claims": [
+        { "claim": "A room grants exactly its doors and denies the rest, by name", "provenBy": "features/rulebook.feature", "via": "→ `deniedDoors` / `deniedDoorSection` in `mod.ts`" },
+        { "claim": "Attenuation is append-only — authority never widens", "provenBy": "features/attenuation.feature", "via": "→ `attenuate` / `attenuatesDoors`" },
+        { "claim": "A capability dies with its lease and never exceeds its ceiling", "provenBy": "features/confinement.feature", "via": "→ `isConfined` / `resolveProvider`" },
+        { "claim": "The engine names no guest, so it works for any agent", "provenBy": "guest-room.test.ts", "via": "(\"names no guest\")" },
+        { "claim": "A door's authority is the same object across unix/vsock/tcp wires", "provenBy": "features/transport.feature", "via": "→ `transportString` / `resolveDoor` in `mod.ts`" },
+        { "claim": "The algebra holds for EVERY case, not just examples (bounded-exhaustive)", "provenBy": "algebra-proofs.test.ts", "via": "(bounded model checking by exhaustion)" },
+        { "claim": "A tcp/vsock door requires a per-launch token; unauthorized peers reach no handler", "provenBy": "protocol.test.ts", "via": "→ `tokenAuthorizer` / `RequestAuthorizer` in `protocol.ts`" },
+        { "claim": "A per-request HMAC door rejects tampered, wrong-key, and replayed requests", "provenBy": "protocol.test.ts", "via": "→ `hmacSigner` / `hmacAuthorizer` / `canonicalRequest`" },
+        { "claim": "A denied request is NEVER forwarded upstream — over real unix sockets and chains", "provenBy": "interpose.test.ts", "via": "→ `enforceAndForward` / `transportToEndpoint` in `interpose.ts`" },
+        { "claim": "A signed grant is honored only if its Ed25519 signature verifies against the issuer key", "provenBy": "signed-grant-authorizer.test.ts", "via": "→ `signedGrantAuthorizer` (`protocol.ts`) / `verifyGrantWithKeys` (`mod.ts`)" }
+      ]
+    },
+    "positioning": "capability allowlisting for agents via socket brokers",
+    "links": {
+      "repo": "https://github.com/bounded-systems/guest-room",
+      "startHere": "START-HERE.md",
+      "scorecard": "docs/scorecard.md"
+    }
+  }
+}
