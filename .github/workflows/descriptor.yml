@@ -1,0 +1,19 @@
+# Drift-gate: the README's managed blocks must match trellis.json. Fails on drift.
+# Consumes @bounded-systems/descriptor-kit (cloned until it publishes to JSR, then
+# this becomes `bunx jsr:@bounded-systems/descriptor-kit check .`; or switch to
+# `descriptor: true` on the shared repo-standard.yml once that input is live).
+name: descriptor
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  descriptor:
+    uses: bounded-systems/.github/.github/workflows/repo-standard.yml@d43c3280588ef05f4ead43426db1091d4cb8f520
+    with:
+      security: false
+      test: true
+      runtime: bun
+      test-command: "git clone --depth 1 https://github.com/bounded-systems/descriptor-kit /tmp/dk && (cd /tmp/dk && bun install --frozen-lockfile) && bun /tmp/dk/src/cli.ts check ."
