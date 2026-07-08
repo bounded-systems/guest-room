@@ -1,0 +1,26 @@
+README.md
+  s_e3fff2f6060e6c::t_c02bb61fe57a22 190
+  s_e3fff2f6060e6c::t_fac26e07c3b69a 1,4,6-9
+  s_e3fff2f6060e6c::t_241172318786fa 172
+  s_e3fff2f6060e6c::t_a8413b2f719005 169-171,176-185
+trellis.json
+  s_e3fff2f6060e6c::t_96dbff7aba786e 1-37
+.github/workflows/descriptor.yml
+  s_e3fff2f6060e6c::t_c310e30491e56b 1-19
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.6.3",
+  "base_commit_sha": "bb91766a0ff7139f5e8deaa12e49226749d7fb8b",
+  "prompts": {},
+  "sessions": {
+    "s_e3fff2f6060e6c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "4b45e8d3-21a6-47bd-bcd5-77e2c160db83",
+        "model": "claude-opus-4-8"
+      },
+      "human_author": "Robert DeLanghe <1240090+bdelanghe@users.noreply.github.com>"
+    }
+  }
+}
