@@ -4,8 +4,13 @@
 by construction — not by a reminder you hope it reads.**
 
 ```sh
+git clone https://github.com/bounded-systems/guest-room
+cd guest-room
 bun run examples/quickstart.ts
 ```
+
+Needs [bun](https://bun.sh). There is no install step — the engine has no
+dependencies.
 
 That prints the rulebook an agent receives at launch: what this launch grants
 and, by name, what it denies. The denied lines are not advice — the capability is
