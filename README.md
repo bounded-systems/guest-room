@@ -128,6 +128,14 @@ kernel, not the payload, decides who is on the other end of a unix-socket door.
 
 ## Usage
 
+Published on JSR as [`@bounded-systems/guest-room`](https://jsr.io/@bounded-systems/guest-room):
+
+```sh
+deno add jsr:@bounded-systems/guest-room   # Deno
+bunx jsr add @bounded-systems/guest-room   # Bun
+npx jsr add @bounded-systems/guest-room    # Node
+```
+
 The engine is parameterized over a **catalog** (the doors a kind of room can
 furnish) and **room bundles** — both supplied by the consumer. `mod.ts` carries
 no product identity: no image, no account model, no container runtime. Those are
@@ -225,7 +233,7 @@ guest-room/
   algebra theorems now proven by exhaustion (`algebra-proofs.test.ts`), and the
   verification roadmap (what to reach for next, in TS or Rust).
 - [`docs/building-guest-room.md`](docs/building-guest-room.md) — a short builder's
-  retrospective: the problem, what got built, the hard part (and what I cut), and
+  retrospective: the problem, what got built, what resisted (and what I cut), and
   what it left behind.
 
 In the object-capability tradition (POLA), with macaroon-style append-only caveat
