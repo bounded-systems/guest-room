@@ -235,6 +235,10 @@ guest-room/
 - [`docs/building-guest-room.md`](docs/building-guest-room.md) — a short builder's
   retrospective: the problem, what got built, what resisted (and what I cut), and
   what it left behind.
+- [`docs/working-in-a-cowork-sandbox.md`](docs/working-in-a-cowork-sandbox.md) —
+  operator guidance for running rooms inside a Cowork session: the two dials that
+  set a session's authority, the `survey`/`land` split, and why the rooms are a
+  safe default rather than enforcement.
 
 In the object-capability tradition (POLA), with macaroon-style append-only caveat
 attenuation and lease-bound confinement.
