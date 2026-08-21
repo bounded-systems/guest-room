@@ -4,7 +4,7 @@
   "private": false,
   "type": "module",
   "description": "Guest-agnostic room+door capability runtime — the core library claude-box is built on.",
-  "license": "PolyForm-Noncommercial-1.0.0",
+  "license": "MIT",
   "author": "Robert DeLanghe (https://github.com/bdelanghe)",
   "repository": {
     "type": "git",
